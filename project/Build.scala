@@ -23,9 +23,7 @@ object AlpineRConnectorBuild extends Build {
                       "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
                       "Sonatype releases" at "https://oss.sonatype.org/content/repositories/releases/",
                       "Spray Repo" at "http://repo.spray.io"),
-    libraryDependencies ++= Seq(
-    	"org.scalatest" %% "scalatest" % "1.9.1" % "test"
-    ),
+    libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.1.6" % "test",
     javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
     shellPrompt <<= name(name => { state: State =>
@@ -75,7 +73,10 @@ object AlpineRConnectorBuild extends Build {
   
   lazy val messages = project.settings(sharedSettings)
 
-  lazy val server = project.settings(sharedSettings ++ akkaSettings).dependsOn(messages)
+  lazy val server = project
+    .settings(sharedSettings ++ akkaSettings)
+    .dependsOn(messages)
+    .settings(libraryDependencies += "org.mockito" % "mockito-all" % "1.9.5")
 
   /* not camelCase, but named the same as directory since Scala's macro will pick it up;
      otherwise, you would have to write the Project() boilerplate
@@ -85,7 +86,8 @@ object AlpineRConnectorBuild extends Build {
     .dependsOn(messages, server)
     .settings(
       libraryDependencies ++= Seq(
-      	"org.mockito" % "mockito-all" % "1.9.5"
+      	"org.mockito" % "mockito-all" % "1.9.5",
+        "org.scalatest" % "scalatest_2.10" % "2.1.6" % "test"
       )
     )
 }
