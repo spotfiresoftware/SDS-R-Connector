@@ -72,9 +72,9 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
       import RMockFixture._
 
-      rConn isConnected () should be(true)
-      rConn eval mean should be(meanResult)
-      rConn eval clearWorkspace should be(rExpNull)
+      rConn isConnected() should be (true)
+      rConn eval mean should be (meanResult)
+      rConn eval clearWorkspace should be (rExpNull)
       intercept[RserveException] { rConn eval badRCode }
 
     }
