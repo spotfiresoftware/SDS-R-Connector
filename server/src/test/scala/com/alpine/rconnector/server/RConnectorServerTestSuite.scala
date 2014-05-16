@@ -22,44 +22,84 @@ import org.rosuda.REngine.{ REXPNull, REXPDouble }
 import org.scalatest.FunSpec
 import org.scalatest.Matchers
 import org.scalatest.mock.MockitoSugar.mock
+import com.alpine.rconnector.messages.{ RRequest, RResponse, RException }
+import akka.pattern.ask
+import akka.testkit.TestKit
+import akka.util.Timeout
+import scala.concurrent.duration._
+import akka.actor.ActorSystem
+import org.scalatest.BeforeAndAfterAll
+import com.typesafe.config.ConfigFactory
+import scala.concurrent.Await
 
-class RConnectorServerTestSuite extends FunSpec with Matchers {
+class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfterAll {
 
-  // TODO: better description
-  describe("Rserve") {
+  implicit val system = ActorSystem("TestActorSystem", ConfigFactory.load())
 
-    // TODO: break up into many tests
-    it("should foo bar") {
+  override def afterAll {
+    TestKit.shutdownActorSystem(system)
+  }
 
-      // TODO: use this as a fixture
-      val rConn = mock[RConnection]
+  implicit val timeout = Timeout(30 seconds)
 
-      // TODO: pull out of here, will need it in fixture for the Testkit
-      class MockRServeActor extends RServeActor {
-        override protected val conn = rConn
-      }
+  object RMockFixture {
 
-      // TODO: use the same for rehearsing and testing because who knows if the creator implemented equals()
-      val mean = "mean(1:10)"
-      val meanResult = new REXPDouble(5.5)
-      val clearWorkspace = "rm(list = ls())"
-      val rExpNull = new REXPNull
-      val badRCode = "thisIsBadRCode"
+    val mean = "mean(1:10)"
+    val meanResult = new REXPDouble(5.5)
+    val clearWorkspace = "rm(list = ls())"
+    val rExpNull = new REXPNull
+    val badRCode = "thisIsBadRCode"
 
-      // TODO: for the REXP asString, will need to mock up the REXP as well
+    val rConn = mock[RConnection]
+    when { rConn isConnected } thenReturn true
+    when { rConn eval mean } thenReturn meanResult
+    when { rConn eval clearWorkspace } thenReturn rExpNull
+    /* NOTE: The Rserve mock throws an RserveException _exception_,
+       but the RServeActor sends an RException _message_ to the calling actor
+       upon the RserveException being thrown by R and propagated to Rserve */
+    when(rConn eval badRCode) thenThrow classOf[RserveException]
+  }
 
-      // TODO: rehearse cases
-      when { rConn isConnected } thenReturn true
-      when { rConn eval mean } thenReturn meanResult
-      when { rConn eval clearWorkspace } thenReturn rExpNull
-      when(rConn eval badRCode) thenThrow classOf[RserveException]
+  class MockRServeActor extends RServeActor {
 
-      // TODO: test cases
-      rConn.isConnected should be(true)
-      rConn.eval(mean) should be(meanResult)
-      rConn.eval(clearWorkspace) should be(rExpNull)
+    override protected val conn = RMockFixture.rConn
+  }
+
+  describe("Rserve Mock") {
+
+    it("should replay recorded behavior") {
+
+      import RMockFixture._
+
+      rConn isConnected () should be(true)
+      rConn eval mean should be(meanResult)
+      rConn eval clearWorkspace should be(rExpNull)
       intercept[RserveException] { rConn eval badRCode }
+
     }
   }
+
+  describe("RServeActor") {
+
+    val mockRServeActor = TestActorRef(new MockRServeActor())
+
+    import RMockFixture.{ badRCode, mean }
+
+    implicit class RichAny(x: Any) {
+      def get: Any = Await.result(mockRServeActor ? x, Duration.Inf)
+    }
+
+    it("should correctly calculate the mean of 1:10") {
+
+      RRequest(mean).get should be(RResponse("5.5"))
+    }
+
+    it("should send an RException message when R evaluates code with a syntax error") {
+
+      RRequest(badRCode).get.getClass should be(classOf[RException])
+    }
+
+  }
+
 }
 
