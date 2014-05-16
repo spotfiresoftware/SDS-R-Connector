@@ -40,7 +40,8 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
     TestKit.shutdownActorSystem(system)
   }
 
-  implicit val timeout = Timeout(30 seconds)
+  val duration = 30 seconds
+  implicit val timeout = Timeout(duration)
 
   object RMockFixture {
 
@@ -86,7 +87,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
     import RMockFixture.{ badRCode, mean }
 
     implicit class RichAny(x: Any) {
-      def get: Any = Await.result(mockRServeActor ? x, Duration.Inf)
+      def get: Any = Await.result(mockRServeActor ? x, duration)
     }
 
     it("should correctly calculate the mean of 1:10") {
