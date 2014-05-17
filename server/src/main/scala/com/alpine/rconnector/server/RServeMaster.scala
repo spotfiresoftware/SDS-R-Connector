@@ -17,14 +17,9 @@ package com.alpine.rconnector.server
 
 import akka.actor._
 import akka.event.Logging
-import scala.concurrent.duration._
-import akka.actor.SupervisorStrategy.{ Escalate, Restart }
 import com.alpine.rconnector.messages._
-import org.rosuda.REngine.{ REXPMismatchException, REngineEvalException, REngineException }
-import org.rosuda.REngine.Rserve.RserveException
 import akka.routing.RoundRobinRouter
 import com.alpine.rconnector.messages.RRequest
-import akka.actor.OneForOneStrategy
 
 /**
  * This class does the routing of requests from clients to the RServeActor, which then
@@ -33,20 +28,19 @@ import akka.actor.OneForOneStrategy
  */
 class RServeMaster extends Actor {
 
-  private[this] val log = Logging(context.system, this)
+  private[this] implicit val log = Logging(context.system, this)
 
-  log.info("\n\n\nStarting RServeMaster\n\n\n")
+  logActorStart(this)
 
   // TODO: base it off of application.conf
   private[this] val numRoutees = 4
 
-  private[this] var rServeRouter: ActorRef = createRServeRouter()
+  protected[this] var rServeRouter: ActorRef = createRServeRouter()
 
-  private[this] def createRServeRouter(): ActorRef = {
+  protected[this] def createRServeRouter(): ActorRef = {
     context.actorOf(
       Props[RServeActorSupervisor].withRouter(RoundRobinRouter(nrOfInstances = numRoutees)
       ), name = "rServeRouter")
-    // RServeActor
   }
 
   def receive: Receive = {

@@ -31,18 +31,17 @@ import akka.event.Logging
  */
 class RServeActor extends Actor {
 
-  private[this] val log = Logging(context.system, this)
+  private[this] implicit val log = Logging(context.system, this)
 
-  protected val conn: RConnection = new RConnection()
+  protected[this] val conn: RConnection = new RConnection()
 
-  log.info("\nStarting RServeActor\n")
+  logActorStart(this)
 
   override def postStop(): Unit = conn.close()
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    sender ! RException(s"R server failure:\n" +
-      s"Message: ${reason.getMessage}\n" +
-      s"Stack trace:\n${reason.getStackTrace.toList.mkString("\n")}")
+    // send message about exception to the client (e.g. for UI reporting)
+    sender ! RException(failure(t = reason, text = "R Server Error"))
     conn.close()
     super.preRestart(reason, message)
   }
@@ -51,7 +50,7 @@ class RServeActor extends Actor {
   override def postRestart(reason: Throwable): Unit = preStart()
 
   // remove all temporary data from R workspace
-  private[this] def clearWorkspace() = conn.eval("rm(list = ls())")
+  protected[this] def clearWorkspace() = conn.eval("rm(list = ls())")
 
   def receive: Receive = {
 

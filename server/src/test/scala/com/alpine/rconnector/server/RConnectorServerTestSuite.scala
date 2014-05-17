@@ -15,84 +15,39 @@
 
 package com.alpine.rconnector.server
 
-import akka.testkit.TestActorRef
-import org.rosuda.REngine.Rserve.{ RConnection, RserveException }
-import org.mockito.Mockito.{ when }
-import org.rosuda.REngine.{ REXPNull, REXPDouble }
-import org.scalatest.FunSpec
-import org.scalatest.Matchers
-import org.scalatest.mock.MockitoSugar.mock
-import com.alpine.rconnector.messages.{ RRequest, RResponse, RException }
-import akka.pattern.ask
+import akka.actor.ActorRef
 import akka.testkit.TestKit
-import akka.util.Timeout
-import scala.concurrent.duration._
-import akka.actor.ActorSystem
-import org.scalatest.BeforeAndAfterAll
-import com.typesafe.config.ConfigFactory
-import scala.concurrent.Await
+import com.alpine.rconnector.messages.{ RRequest, RException, RStart, RStop, StartAck, StopAck }
+import org.rosuda.REngine.Rserve.RserveException
+import org.scalatest.{ BeforeAndAfterAll, FunSpec, Matchers }
 
 class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfterAll {
 
-  implicit val system = ActorSystem("TestActorSystem", ConfigFactory.load())
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
-
-  val duration = 30 seconds
-  implicit val timeout = Timeout(duration)
-
-  object RMockFixture {
-
-    val mean = "mean(1:10)"
-    val meanResult = new REXPDouble(5.5)
-    val clearWorkspace = "rm(list = ls())"
-    val rExpNull = new REXPNull
-    val badRCode = "thisIsBadRCode"
-
-    val rConn = mock[RConnection]
-    when { rConn isConnected } thenReturn true
-    when { rConn eval mean } thenReturn meanResult
-    when { rConn eval clearWorkspace } thenReturn rExpNull
-    /* NOTE: The Rserve mock throws an RserveException _exception_,
-       but the RServeActor sends an RException _message_ to the calling actor
-       upon the RserveException being thrown by R and propagated to Rserve */
-    when(rConn eval badRCode) thenThrow classOf[RserveException]
-  }
-
-  class MockRServeActor extends RServeActor {
-
-    override protected val conn = RMockFixture.rConn
-  }
+  implicit val system = MocksAndFixtures.system
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   describe("Rserve Mock") {
 
     it("should replay recorded behavior") {
 
-      import RMockFixture._
+      import MocksAndFixtures.{ badRCode, clearWorkspace, mean, meanResult, rConn, rExpNull }
 
-      rConn isConnected() should be (true)
-      rConn eval mean should be (meanResult)
-      rConn eval clearWorkspace should be (rExpNull)
+      rConn isConnected () should be(true)
+      rConn eval mean should be(meanResult)
+      rConn eval clearWorkspace should be(rExpNull)
       intercept[RserveException] { rConn eval badRCode }
-
     }
   }
 
   describe("RServeActor") {
 
-    val mockRServeActor = TestActorRef(new MockRServeActor())
+    import MocksAndFixtures.{ badRCode, mean, meanResultMsg, mockRServeActor, rExpNull, RichAny }
 
-    import RMockFixture.{ badRCode, mean }
-
-    implicit class RichAny(x: Any) {
-      def get: Any = Await.result(mockRServeActor ? x, duration)
-    }
+    implicit val ref: ActorRef = mockRServeActor
 
     it("should correctly calculate the mean of 1:10") {
 
-      RRequest(mean).get should be(RResponse("5.5"))
+      RRequest(mean).get should be(meanResultMsg)
     }
 
     it("should send an RException message when R evaluates code with a syntax error") {
@@ -100,7 +55,62 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
       RRequest(badRCode).get.getClass should be(classOf[RException])
     }
 
+    it("should be able to clear the R workspace") {
+
+      // the original clearWorkspace is protected, so we use the public delegating method from the mock
+      mockRServeActor.underlyingActor.clrWorkspace() should be(rExpNull)
+    }
   }
 
+  describe("RServeActorSupervisor") {
+
+    import MocksAndFixtures.{ badRCode, mean, meanResultMsg, RichAny, supervisor }
+
+    implicit val ref = supervisor
+
+    /* If you throw an exception, RServeActor should be able to restart,
+         given the MockRServeActorSupervisor's SupervisorStrategy */
+    it("""should handle RServeActor's failures""") {
+
+      // test the mean evaluation to make sure the RServeActor is running
+      RRequest(mean).get should be(meanResultMsg)
+
+      // throw an exception
+      RRequest(badRCode).get.getClass should be(classOf[RException])
+
+      // test evaluation of correct code again
+      RRequest(mean).get should be(meanResultMsg)
+    }
+  }
+
+  describe("RServeMaster") {
+
+    import MocksAndFixtures.{ mean, meanResultMsg, RichAny, rServeMaster }
+    implicit val ref = rServeMaster
+
+    it("""should route requests to RServeActor via the
+         router and RServeActorSuperviso and get back messages""") {
+
+      RRequest(mean).get should be(meanResultMsg)
+
+    }
+
+    it("should be able to shut down the routees") {
+
+      RStop.get should be(StopAck)
+    }
+
+    it("should be able to restart the routees") {
+
+      RStart.get should be(StartAck)
+    }
+
+    it("should be able to send messages to RServeActor after router restart ") {
+
+      RStart.get
+      RRequest(mean).get should be(meanResultMsg)
+    }
+
+  }
 }
 

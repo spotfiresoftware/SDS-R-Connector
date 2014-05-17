@@ -19,11 +19,18 @@ import akka.event.LoggingAdapter
 
 package object server {
 
-  def logFailure(t: Throwable)(implicit log: LoggingAdapter) = {
-    log.info(s"Throwable: ${t.getClass.getName}\n")
-    log.info(s"Cause: ${t.getCause}\n")
-    log.info(s"Message: ${t.getMessage}\n")
-    log.info(s"Stack trace: ${t.getStackTrace}\n")
+  def logFailure(t: Throwable)(implicit log: LoggingAdapter): Unit = {
+    log.info(failure(t))
+  }
+
+  def failure(t: Throwable, text: String = "Error"): String = {
+
+    s"""$text: ${t.getClass.getName}\nCause: ${t.getCause}\nMessage: ${t.getMessage}\nStack trace: ${t.getStackTrace.mkString("\n")}\n"""
+  }
+
+  def logActorStart(clazz: Any)(implicit log: LoggingAdapter): Unit = {
+
+    log.info(s"\n\nStarting ${clazz.getClass.getSimpleName}\n\n")
   }
 
 }

@@ -18,6 +18,7 @@ package com.alpine.rconnector.server
 import akka.kernel.Bootable
 import akka.actor.{ Props, ActorSystem }
 import com.typesafe.config.ConfigFactory
+import akka.event.Logging
 
 /**
  * This class is used by the Akka microkernel to boot up the R server
@@ -32,8 +33,8 @@ import com.typesafe.config.ConfigFactory
  */
 class RMicrokernelMaster extends Bootable {
 
-  val config = ConfigFactory.load()
-  val system = ActorSystem.create("rServeActorSystem", config.getConfig("rServeKernelApp"))
+  protected[this] val config = ConfigFactory.load()
+  protected[this] val system = ActorSystem.create("rServeActorSystem", config.getConfig("rServeKernelApp"))
 
   override def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
 
