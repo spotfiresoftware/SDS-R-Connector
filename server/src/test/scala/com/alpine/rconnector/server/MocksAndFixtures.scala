@@ -19,7 +19,7 @@ import akka.actor.{ ActorSystem, ActorRef }
 import akka.pattern.ask
 import akka.testkit.TestActorRef
 import akka.util.Timeout
-import com.alpine.rconnector.messages.RResponse
+import com.alpine.rconnector.messages.{ Message, RResponse }
 import com.typesafe.config.ConfigFactory
 import org.mockito.Mockito.when
 import org.rosuda.REngine.{ REXPNull, REXPDouble }
@@ -78,7 +78,7 @@ object MocksAndFixtures {
   val duration = 30 seconds
   implicit val timeout = Timeout(duration)
 
-  implicit class RichAny(x: Any) {
+  implicit class RichMessage(x: Message) {
 
     def get(implicit ref: ActorRef): Any = Await.result(ref ? x, duration)
   }

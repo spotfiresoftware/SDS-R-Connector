@@ -41,7 +41,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
   describe("RServeActor") {
 
-    import MocksAndFixtures.{ badRCode, mean, meanResultMsg, mockRServeActor, rExpNull, RichAny }
+    import MocksAndFixtures.{ badRCode, mean, meanResultMsg, mockRServeActor, rExpNull, RichMessage }
 
     implicit val ref: ActorRef = mockRServeActor
 
@@ -64,7 +64,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
   describe("RServeActorSupervisor") {
 
-    import MocksAndFixtures.{ badRCode, mean, meanResultMsg, RichAny, supervisor }
+    import MocksAndFixtures.{ badRCode, mean, meanResultMsg, RichMessage, supervisor }
 
     implicit val ref = supervisor
 
@@ -85,7 +85,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
   describe("RServeMaster") {
 
-    import MocksAndFixtures.{ mean, meanResultMsg, RichAny, rServeMaster }
+    import MocksAndFixtures.{ mean, meanResultMsg, RichMessage, rServeMaster }
     implicit val ref = rServeMaster
 
     it("""should route requests to RServeActor via the
