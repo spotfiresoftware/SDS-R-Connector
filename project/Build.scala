@@ -8,7 +8,10 @@ import ImplicitUtil.SeqSettingsProject
 
 object AlpineRConnectorBuild extends Build {
 
-  lazy val sharedSettings = Defaults.defaultSettings ++ Seq(  
+  val filterAppConf = (ms: Seq[(File,String)]) =>
+      ms filter { case (file, toPath) => !toPath.endsWith("application.conf") }
+
+  lazy val sharedSettings = Defaults.defaultSettings ++ scalariformSettings ++ assemblySettings  ++ Seq(  
     version := "0.1",
     organization := "com.alpine",
     scalaVersion := "2.10.3",
@@ -39,16 +42,13 @@ object AlpineRConnectorBuild extends Build {
 		  current findFirstMatchIn gitBranches map (_.group(1)) getOrElse "-"
   	    )
     }),
+    mappings in (Compile, packageBin) ~= { filterAppConf },
     mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) => {
-      case PathList("META-INF", xs @ _*) =>
-	    (xs map {_.toLowerCase}) match {
-	      case ("MANIFEST.MF" :: Nil) | ("index.list" :: Nil) | ("dependencies" :: Nil) => MergeStrategy.discard
-	      case _ => MergeStrategy.discard
-	  }
-      case _ => MergeStrategy.first 
-      }
-    }
-  ) ++ scalariformSettings ++ assemblySettings
+      case "application.conf"     => MergeStrategy.discard
+      case x => old(x)
+    }},
+    test in assembly := {}
+  )
 
   lazy val akkaSettings = Seq(
   	libraryDependencies ++= {
@@ -69,15 +69,22 @@ object AlpineRConnectorBuild extends Build {
     .in(file("."))
     .aggregate(messages, server, sample_client)
     .settings(sharedSettings)
-    .settings(name := "alpine-r-connector")
+    .settings(
+      artifact in (Compile, assembly) ~= { art =>
+        art.copy(`classifier` = Some("assembly"))
+     }).settings(
+      addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
   
   lazy val messages = project.settings(sharedSettings)
 
   lazy val server = project
-    .settings(sharedSettings ++ akkaSettings)
     .dependsOn(messages)
-    .settings(libraryDependencies += "org.mockito" % "mockito-all" % "1.9.5")
-
+    .settings(sharedSettings ++ akkaSettings)
+    .settings(artifact in (Compile, assembly) ~= { art =>
+        art.copy(`classifier` = Some("assembly"))
+     })
+    .settings(libraryDependencies += "org.mockito" % "mockito-all" % "1.9.5" % "test")
+   
   /* not camelCase, but named the same as directory since Scala's macro will pick it up;
      otherwise, you would have to write the Project() boilerplate
    */

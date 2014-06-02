@@ -27,15 +27,17 @@ sealed trait Message extends Serializable
 
 /**
  * Request from Scala/Java to R
- * @param msg message - R code to execute
+ * @param rScript message - R code to execute
+ * @param returnSet - set of elements to return after R execution
+ * (a Java HashSet as opposed to a Scala one becasuse the object will be instantiated in Java)
  */
-case class RRequest(msg: String) extends Message
+case class RRequest(rScript: String, returnSet: java.util.Set[String]) extends Message
 
 /**
  * Response from R to Scala/Java
- * @param msg message - results coming back from R to Scala/Java
+ * @param map - map of results coming back from R to Scala/Java
  */
-case class RResponse(msg: String) extends Message
+case class RResponse(map: java.util.Map[String, Any]) extends Message
 
 /**
  *

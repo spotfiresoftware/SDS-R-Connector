@@ -27,14 +27,16 @@ import org.rosuda.REngine.Rserve.{ RConnection, RserveException }
 import org.scalatest.mock.MockitoSugar.mock
 import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.collection.JavaConversions._
 
 object MocksAndFixtures {
 
   implicit val system = ActorSystem("TestActorSystem", ConfigFactory.load())
 
-  val mean = "mean(1:10)"
+  val mean = "x = mean(1:10)"
+  val x = "x"
   val meanResult = new REXPDouble(5.5)
-  val meanResultMsg = RResponse(meanResult.asString)
+  val meanResultMsg = RResponse(Map("x" -> meanResult.asString))
   val clearWorkspace = "rm(list = ls())"
   val rExpNull = new REXPNull
   val badRCode = "thisIsBadRCode"
@@ -48,6 +50,7 @@ object MocksAndFixtures {
      but the RServeActor sends an RException _message_ to the calling actor
      upon the RserveException being thrown by R and propagated to Rserve */
   when(rConn eval badRCode) thenThrow classOf[RserveException]
+  when(rConn eval x) thenReturn (meanResult)
 
   // have RServeActor use the mock of the R connection
   class MockRServeActor extends RServeActor {

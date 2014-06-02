@@ -15,28 +15,30 @@
 
 package com.alpine.rconnector.server
 
-import akka.kernel.Bootable
 import akka.actor.{ Props, ActorSystem }
 import com.typesafe.config.ConfigFactory
-import akka.event.Logging
 
 /**
- * This class is used by the Akka microkernel to boot up the R server
- * (the actor system accepting JVM requests to a pool of R workers).
- * <br>
- * Usage: put the jar file containing this class into Akka's bin/ directory,
- * the run
- * $bin/akka com.alpine.rconnector.server.RMicrokernelMaster
- * <br>
- * For more information, see
- * <a href="http://doc.akka.io/docs/akka/2.3.0/scala/microkernel.html">Akka's microkernel documentation</a>.
+ * This starts up the R server actor system.
  */
-class RMicrokernelMaster extends Bootable {
+object RServeMain {
 
   protected[this] val config = ConfigFactory.load()
   protected[this] val system = ActorSystem.create("rServeActorSystem", config.getConfig("rServeKernelApp"))
 
-  override def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
+  // need to exit cleanly (e.g. on Ctrl+C), so shut down actor system and free up ports
+  Runtime.getRuntime.addShutdownHook(new Thread() {
+    override def run: Unit = {
+      println("Shutting down actor system")
+      system.shutdown()
+      println("Shutdown complete")
+    }
+  })
 
-  override def shutdown(): Unit = system.shutdown()
+  def main(args: Array[String]): Unit = startup()
+
+  def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
+
+  def shutdown(): Unit = system.shutdown()
+
 }

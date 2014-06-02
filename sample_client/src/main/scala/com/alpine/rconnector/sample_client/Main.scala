@@ -3,12 +3,12 @@ package com.alpine.rconnector.client
 import com.typesafe.config.ConfigFactory
 import akka.actor.{ Props, ActorSystem }
 import com.alpine.rconnector.messages.{ RStart, RStop, RRequest }
-import com.alpine.rconnector.server.RMicrokernelMaster
+import com.alpine.rconnector.server.RServeMain
+import scala.collection.JavaConversions._
 
 object Main extends App {
 
-  val test = new RMicrokernelMaster()
-  test.startup()
+  RServeMain.startup()
 
   Thread.sleep(1000)
 
@@ -30,22 +30,15 @@ object Main extends App {
       """.stripMargin
   */
 
-  val rScript = "foo"
-
-  for (i <- 1 to 2) {
-
-    client ! RRequest(rScript)
-  }
-
   Thread.sleep(5000)
 
   client ! RStop
   Thread.sleep(5000)
   client ! RStart
   Thread.sleep(5000)
-  client ! RRequest("mean(1:10)")
+  client ! RRequest("x = mean(1:10)", Set("x"))
   Thread.sleep(5000)
 
   system.shutdown()
-  test.shutdown()
+  RServeMain.shutdown()
 }

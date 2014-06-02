@@ -20,6 +20,8 @@ import akka.AkkaException
 import akka.actor.Actor
 import com.alpine.rconnector.messages.{ RException, RResponse, RRequest }
 import akka.event.Logging
+import org.rosuda.REngine.REXP
+import scala.collection.JavaConversions._
 
 /**
  * This is the actor that establishes a connection to R via Rserve
@@ -54,17 +56,29 @@ class RServeActor extends Actor {
 
   def receive: Receive = {
 
-    case RRequest(msg) => {
+    case RRequest(rScript: String, returnSet: java.util.Set[String]) => {
 
       log.info(s"In RServeActor: received request from client through the router")
       clearWorkspace() // clear now in case previous user R code execution failed
-      sender ! RResponse(conn.eval(msg).asString)
+
+      def eval(s: String) = conn.eval(s).asInstanceOf[REXP].asNativeJavaObject
+
+      val results = returnSet.map(elem => (elem, eval(elem))).toMap
+
+      println(s"\n\n\n${results.getClass.getName}: ${results.toString}\n\n\n")
+
+      sender ! RResponse(results)
+
       clearWorkspace() // clean up after execution
       log.info(s"In RServeActor: done with R request, sent response")
 
     }
 
     case other => throw new AkkaException(s"Unexpected message of type ${other.getClass.getName} from $sender")
+
+  }
+
+  def convertRExp(): Unit = {
 
   }
 

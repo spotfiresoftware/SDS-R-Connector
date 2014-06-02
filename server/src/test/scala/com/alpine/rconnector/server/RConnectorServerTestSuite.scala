@@ -20,6 +20,7 @@ import akka.testkit.TestKit
 import com.alpine.rconnector.messages.{ RRequest, RException, RStart, RStop, StartAck, StopAck }
 import org.rosuda.REngine.Rserve.RserveException
 import org.scalatest.{ BeforeAndAfterAll, FunSpec, Matchers }
+import scala.collection.JavaConversions._
 
 class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfterAll {
 
@@ -47,12 +48,12 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
     it("should correctly calculate the mean of 1:10") {
 
-      RRequest(mean).get should be(meanResultMsg)
+      RRequest(mean, Set("x")).get should be(meanResultMsg)
     }
 
     it("should send an RException message when R evaluates code with a syntax error") {
 
-      RRequest(badRCode).get.getClass should be(classOf[RException])
+      RRequest(badRCode, Set("badRCode")).get.getClass should be(classOf[RException])
     }
 
     it("should be able to clear the R workspace") {
@@ -73,13 +74,13 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
     it("""should handle RServeActor's failures""") {
 
       // test the mean evaluation to make sure the RServeActor is running
-      RRequest(mean).get should be(meanResultMsg)
+      RRequest(mean, Set("x")).get should be(meanResultMsg)
 
       // throw an exception
-      RRequest(badRCode).get.getClass should be(classOf[RException])
+      RRequest(badRCode, Set("badRCode")).get.getClass should be(classOf[RException])
 
       // test evaluation of correct code again
-      RRequest(mean).get should be(meanResultMsg)
+      RRequest(mean, Set("x")).get should be(meanResultMsg)
     }
   }
 
@@ -91,7 +92,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
     it("""should route requests to RServeActor via the
          router and RServeActorSuperviso and get back messages""") {
 
-      RRequest(mean).get should be(meanResultMsg)
+      RRequest(mean, Set("x")).get should be(meanResultMsg)
 
     }
 
@@ -108,7 +109,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
     it("should be able to send messages to RServeActor after router restart ") {
 
       RStart.get
-      RRequest(mean).get should be(meanResultMsg)
+      RRequest(mean, Set("x")).get should be(meanResultMsg)
     }
 
   }
