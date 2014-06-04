@@ -31,7 +31,14 @@ sealed trait Message extends Serializable
  * @param returnSet - set of elements to return after R execution
  * (a Java HashSet as opposed to a Scala one becasuse the object will be instantiated in Java)
  */
-case class RRequest(rScript: String, returnSet: java.util.Set[String]) extends Message
+case class RRequest(clientUUID: String, rScript: String,
+  returnSet: java.util.List[String]) extends Message
+
+/**
+ *
+ * @param dataFrames
+ */
+case class RAssign(uuid: String, dataFrames: java.util.Map[String, String]) extends Message
 
 /**
  * Response from R to Scala/Java
@@ -66,3 +73,15 @@ case object RStop extends Message
  * Acknowledge R worker stop
  */
 case object StopAck extends Message
+
+/**
+ *
+ * @param uuid
+ */
+case class FinishRSession(uuid: String)
+
+/**
+ *
+ * @param uuid
+ */
+case class AssignAck(uuid: String)
