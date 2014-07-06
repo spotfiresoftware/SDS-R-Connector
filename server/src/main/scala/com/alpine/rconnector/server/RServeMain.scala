@@ -16,6 +16,7 @@
 package com.alpine.rconnector.server
 
 import akka.actor.{ Props, ActorSystem }
+import akka.event.Logging
 import com.typesafe.config.ConfigFactory
 
 /**
@@ -23,22 +24,21 @@ import com.typesafe.config.ConfigFactory
  */
 object RServeMain {
 
-  protected[this] val config = ConfigFactory.load()
-  protected[this] val system = ActorSystem.create("rServeActorSystem", config.getConfig("rServeKernelApp"))
+  val config = ConfigFactory.load()
+  private val system = ActorSystem.create("rServeActorSystem", config.getConfig("rServeKernelApp"))
+
+  def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
+  def shutdown(): Unit = system.shutdown()
 
   // need to exit cleanly (e.g. on Ctrl+C), so shut down actor system and free up ports
   Runtime.getRuntime.addShutdownHook(new Thread() {
     override def run: Unit = {
       println("Shutting down actor system")
-      system.shutdown()
+      shutdown()
       println("Shutdown complete")
     }
   })
 
   def main(args: Array[String]): Unit = startup()
-
-  def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
-
-  def shutdown(): Unit = system.shutdown()
 
 }

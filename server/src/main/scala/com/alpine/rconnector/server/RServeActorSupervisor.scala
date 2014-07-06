@@ -29,13 +29,15 @@ import akka.event.Logging
  */
 class RServeActorSupervisor extends Actor {
 
-  private[this] implicit val log = Logging(context.system, this)
+  private implicit val log = Logging(context.system, this)
   protected[this] val rServe = context.actorOf(Props[RServeActor])
 
   logActorStart(this)
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
 
+    /* Capture the known exceptions, log the failure and restart actor.
+       The actor being restarted will tell the sender about the failure. */
     case e @ (_: RserveException | _: REngineException |
       _: REngineEvalException | _: REXPMismatchException) => {
       logFailure(e)

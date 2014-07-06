@@ -17,7 +17,10 @@
 
 package com.alpine.rconnector.messages
 
-/* Messages for communication between Alpine's backend and the R server.
+import java.util.{ Map => JMap }
+
+/**
+ * Messages for communication between Alpine's backend and the R server.
  * <p>
  * <b>Note:</b> even though the messages are serializable using the Java serialization API,
  * Akka uses Protobuf by default, and that is preferred. The Serializable market trait
@@ -31,20 +34,19 @@ sealed trait Message extends Serializable
  * @param returnSet - set of elements to return after R execution
  * (a Java HashSet as opposed to a Scala one becasuse the object will be instantiated in Java)
  */
-case class RRequest(clientUUID: String, rScript: String,
-  returnSet: java.util.List[String]) extends Message
+case class RRequest(clientUUID: String, rScript: String, returnSet: Array[_]) extends Message
 
 /**
  *
  * @param dataFrames
  */
-case class RAssign(uuid: String, dataFrames: java.util.Map[String, String]) extends Message
+case class RAssign(uuid: String, dataFrames: JMap[String, String]) extends Message
 
 /**
  * Response from R to Scala/Java
  * @param map - map of results coming back from R to Scala/Java
  */
-case class RResponse(map: java.util.Map[String, Any]) extends Message
+case class RResponse(map: Map[String, Any]) extends Message
 
 /**
  *
@@ -78,10 +80,28 @@ case object StopAck extends Message
  *
  * @param uuid
  */
-case class FinishRSession(uuid: String)
+case class FinishRSession(uuid: String) extends Message
 
 /**
  *
  * @param uuid
  */
-case class AssignAck(uuid: String)
+case class AssignAck(uuid: String, variables: Array[String]) extends Message
+
+// case class IsRActorAvailable(uuid: String) extends Message
+
+/**
+ *
+ */
+// case object AvailableRActorFound extends Message
+
+/**
+ *
+ */
+case object RActorIsNotAvailable extends Message
+
+/**
+ *
+ * @param uuid
+ */
+case class RSessionFinishedAck(uuid: String) extends Message

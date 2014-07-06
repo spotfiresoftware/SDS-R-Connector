@@ -20,12 +20,13 @@ import akka.AkkaException
 import akka.actor.Actor
 import com.alpine.rconnector.messages._
 import akka.event.Logging
-import org.rosuda.REngine.REXP
+// import org.rosuda.REngine.REXP
 import scala.collection.JavaConversions._
 import com.alpine.rconnector.messages.RException
 import com.alpine.rconnector.messages.RResponse
 import com.alpine.rconnector.messages.RRequest
 import com.alpine.rconnector.messages.FinishRSession
+import java.util.{ Map => JMap }
 
 /**
  * This is the actor that establishes a connection to R via Rserve
@@ -60,75 +61,39 @@ class RServeActor extends Actor {
 
   def receive: Receive = {
 
-    case RRequest(clientUUID: String, rScript: String, returnSet: java.util.List[_]) => {
+    case RRequest(clientUUID, rScript, returnSet: Array[String]) => {
 
-      def eval(s: String) = {
-        conn.eval(s).asInstanceOf[REXP].asNativeJavaObject
-      }
+      def eval(s: String) = conn.eval(s).asNativeJavaObject // .asInstanceOf[REXP].asNativeJavaObject
 
       // first eval rScript
       log.info("\n\nEvaluating R Script\n\n")
-      println("\n\nEvaluating R Script\n\n")
       conn.eval(rScript)
 
-      //      log.info(s"\n\nIn RServeActor: received request from client through the router")
-      //      log.info(s"returnSet:\n $returnSet")
-      //      log.info(s"rScript:\n $rScript\n\n")
-      //      log.info("\n\nAbout to evaluate ls()\n\n")
-      //      log.info(s"Currently in R workspace:\n ${eval("ls()").asInstanceOf[Array[String]].toList}")
+      val results = returnSet.map(elem => (elem, eval(elem))).toMap
 
-      //      println(s"In RServeActor: received request from client through the router")
-      //      println(s"returnSet = $returnSet")
-      //      println(s"rScript = $rScript\n\n")
-      //      println("\n\nAbout to evaluate ls()\n\n")
-      //      println(s"Currently in R workspace:\n ${eval("ls()").asInstanceOf[Array[String]].toList}")
+      log.info(s"\n\nRESULTS: $results")
+      log.info(s"\n\n${results.getClass.getName}: ${results.toString}\n\n")
 
-      // this has to be a Java object, otherwise it won't be serializable
-      val results =
-        returnSet.map(_.asInstanceOf[String]).map((elem: String) => {
-          //          log.info(s"Currently in R workspace:\n ${eval("ls()").asInstanceOf[Array[String]].toList}")
-          //          println(s"Currently in R workspace:\n ${eval("ls()").asInstanceOf[Array[String]].toList}")
-          //          log.info(s"\n\nEvaluating\n $elem\n")
-          //          println(s"\n\nEvaluating\n $elem\n")
-          val res = eval(elem)
-          //          log.info(s"Evaluated:\n${res.asInstanceOf[Array[String]].toList}\n\n")
-          //          println(s"Evaluated:\n${res.asInstanceOf[Array[String]].toList}\n\n")
-          //          log.info(s"Current memory state:\n${eval("ls()").asInstanceOf[Array[String]].toList}\n\n")
-          //          println(s"Current memory state:\n${eval("ls()").asInstanceOf[Array[String]].toList}\n\n")
-          (elem, res)
-        })
+      sender ! RResponse(results)
 
-      log.info(s"\n\n\nRESULTS: $results")
-
-      // TODO: first eval rScript, only then do the other stuff
-      val javaResults: java.util.HashMap[String, Any] = new java.util.HashMap[String, Any]()
-      results.foreach((pair: (String, Any)) => javaResults.put(pair._1, pair._2))
-
-      println(s"\n\n\n${javaResults.getClass.getName}: ${javaResults.toString}\n\n\n")
-
-      sender ! RResponse(javaResults)
-
-      // clearWorkspace() // clean up after execution
       log.info(s"In RServeActor: done with R request, sent response")
-      println(s"In RServeActor: done with R request, sent response")
 
     }
 
-    case RAssign(clientUUID: String, dataFrames) => {
-      // TODO: need to address the workspace clearing differently
-      conn.eval("rm(list = ls())")
-      dataFrames.asInstanceOf[java.util.Map[String, String]].foreach { elem: (String, String) =>
-        conn.assign(elem._1, elem._2)
-      }
-      sender ! AssignAck(clientUUID)
+    case RAssign(clientUUID: String, dataFrames: JMap[_, _]) => {
+
+      // asInstanceOf[JMap[String, String]].foreach { elem => conn.assign(elem._1, elem._2) }
+      dataFrames.foreach { elem => conn.assign(elem._1, elem._2) }
+      log.info(s"""\n\nAssigned the following variables to the R workspace for session $clientUUID:\n
+                   ${dataFrames.keySet} """)
+      sender ! AssignAck(clientUUID, dataFrames.keySet.map(_.toString).toArray)
     }
 
     case FinishRSession(uuid) => {
 
-      log.info(s"Finishing sticky R session for UUID $uuid")
-      println(s"Finishing sticky R session for UUID $uuid")
-
+      log.info(s"Finishing R session for UUID $uuid")
       clearWorkspace()
+      sender ! RSessionFinishedAck(uuid)
     }
 
     case other => throw new AkkaException(s"Unexpected message of type ${other.getClass.getName} from $sender")

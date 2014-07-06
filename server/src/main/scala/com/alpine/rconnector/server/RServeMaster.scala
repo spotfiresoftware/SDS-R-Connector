@@ -18,74 +18,107 @@ package com.alpine.rconnector.server
 import akka.actor._
 import akka.event.Logging
 import com.alpine.rconnector.messages._
-import akka.routing.RoundRobinRouter
 import com.alpine.rconnector.messages.RRequest
+import com.typesafe.config.ConfigFactory
 import scala.collection.mutable.HashMap
 
 /**
  * This class does the routing of requests from clients to the RServeActor, which then
  * talks directly to R. It also supervises the RServeActors, restarting them in case of
  * connection failures, resumes them in case of R code evaluation failures (bugs in user code), etc.
+ *
+ * @author Marek Kolodziej
+ * @since 6/1/2014
  */
 class RServeMaster extends Actor {
 
-  private[this] implicit val log = Logging(context.system, this)
+  private implicit val log = Logging(context.system, this)
 
   logActorStart(this)
 
-  // TODO: base it off of application.conf
-  private[this] val numRoutees = 4
+  private val config = ConfigFactory.load().getConfig("rServeKernelApp")
+  protected val numRoutees = config.getInt("akka.rServe.numActors")
 
-  protected[this] var rServeRouter: Vector[ActorRef] = createRServeRouter()
+  log.info(s"\n\nnumActors = $numRoutees\n\n")
 
-  protected[this] def createRServeRouter(): Vector[ActorRef] =
-    Vector.fill(numRoutees)(context.actorOf(Props[RServeActorSupervisor]))
+  /* rServeRouter is a var because the RServeMaster may keep on running while
+  the RServeActors may be shut down by the client by sending the RStop
+  message to RServeMaster. The actors can then be restarted by having
+  the client send the RStart message. */
+  protected var rServeRouter: Option[Vector[ActorRef]] = createRServeRouter()
 
-  private[this] val sessionMap = new HashMap[String, ActorRef]
+  /* Call to create the router, either upon RServeMaster start
+     or to restart when the RStart message is received, after a prior
+     receipt of the RStop message.
+   */
+  protected def createRServeRouter(): Option[Vector[ActorRef]] =
+    Some(Vector.fill(numRoutees)(context.actorOf(Props[RServeActorSupervisor])))
 
-  private[this] var currentRoutee = 0
+  /* Map to hold session UUID keys and corresponding ActorRef values.
+     This allows the R session to be sticky and for the messages from the client
+     to be redirected to the appropriate R worker, despite the load balancing.
+     This is necessary for multiple R requests to be made by the client,
+     e.g. for streaming data in chunks from Java to R, and other situations
+     that require the Java-R connection be to be stateful beyond a single request.
+   */
+  private val sessionMap = new HashMap[String, ActorRef]
 
-  private[this] def resolveActor(uuid: String): ActorRef = {
+  /* Find if there is a free actor and send its ActorRef, otherwise send None.
+     This is necessary because there may be more Java requests to R workers
+     than there are workers available.
+   */
+  private def resolveActor(uuid: String): Option[ActorRef] = {
 
     if (sessionMap.contains(uuid)) {
 
       log.info(s"Found actor responsible for session $uuid - it is ${sessionMap(uuid)}")
-      println(s"Found actor responsible for session $uuid - it is ${sessionMap(uuid)}")
-      sessionMap(uuid)
+      Some(sessionMap(uuid))
 
     } else {
 
-      currentRoutee = (currentRoutee + 1) % numRoutees
-      val routeeRef = rServeRouter(currentRoutee)
+      val availableActors = rServeRouter.map(_.toSet &~ sessionMap.values.toSet)
 
-      log.info(s"Assigning new actor for session $uuid - currentRoutee = $currentRoutee")
-      log.info(s"ActorRef in question is $routeeRef")
-      println(s"Assigning new actor for session $uuid - currentRoutee = $currentRoutee")
-      println(s"ActorRef in question is $routeeRef")
+      availableActors match {
 
-      sessionMap += (uuid -> routeeRef)
-      routeeRef
+        case Some(set) if !set.isEmpty => {
+
+          val unusedActor = set.head
+          log.info(s"\n\nFound unused actor for session $uuid - it is $unusedActor\n\n")
+          sessionMap += (uuid -> unusedActor)
+          Some(unusedActor)
+        }
+
+        case _ => None
+      }
     }
   }
 
+  /* The main message-processing method of the actor */
   def receive: Receive = {
 
     case x @ RRequest(uuid, _, _) => {
 
       log.info(s"\n\nRServeMaster: received RRequest request and routing it to RServe actor\n\n")
-      println(s"\n\nRServeMaster: received RRequest request and routing it to RServe actor\n\n")
 
-      resolveActor(uuid).tell(x, sender)
+      resolveActor(uuid) match {
+
+        case Some(ref) => ref.tell(x, sender)
+        case None => sender ! RActorIsNotAvailable
+      }
     }
 
-    case x @ RAssign(uuid: String, _) => {
+    case x @ RAssign(uuid, _) => {
 
       log.info(s"\n\nRServeMaster: received RAssign request and routing it to RServe actor\n\n")
-      println(s"\n\nRServeMaster: received RAssign request and routing it to RServe actor\n\n")
 
-      resolveActor(uuid).tell(x, sender)
+      resolveActor(uuid) match {
+
+        case Some(ref) => ref.tell(x, sender)
+        case None => sender ! RActorIsNotAvailable
+      }
     }
 
+    /* Restart the router after it was previously stopped via RStop */
     case RStart => {
 
       log.info(s"\n\nMaster: Starting router\n\n")
@@ -94,21 +127,25 @@ class RServeMaster extends Actor {
       sender ! StartAck
     }
 
+    /* Stop the router, shut down the R workers, and clear the R session map */
     case RStop => {
 
       // TODO: need to shutdown RServeMaster, and this should be handled by its newly created supervisor
       log.info(s"\n\nMaster: Stopping router\n\n")
 
-      // rServeRouter ! PoisonPill
+      rServeRouter.foreach(_.foreach(_.tell(PoisonPill, self)))
+      rServeRouter = None
+      sessionMap.clear()
+
       sender ! StopAck
     }
 
+    /* Unbind an individual R session */
     case x @ FinishRSession(uuid) => {
 
       log.info(s"\n\nFinishing R session for client ID $uuid\n\n")
-      println(s"\n\nFinishing R session for client ID $uuid\n\n")
 
-      sessionMap(uuid) ! x
+      sessionMap(uuid).tell(x, sender)
       sessionMap -= uuid
     }
   }
