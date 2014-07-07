@@ -48,7 +48,6 @@ You do not need to use the master build file if you do not want to - particularl
 3. Check the log file ("r_log.txt" in the above example for failures).
 4. Get SBT 0.13.2 or later (warning, the build was only tested with this specific version). You can find all the information for your OS [here](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html).
 5. Start SBT at the root of the project, i.e. [here](https://github.com/alpinedatalabs/alpine-r). Use the interactive mode the first time to get feedback about each step, instead of having SBT fail one task and shutting down.
-
  ```sh
     $sbt
        // in case you need to reload the build definition
@@ -72,37 +71,25 @@ You do not need to use the master build file if you do not want to - particularl
       // but without the sample_client code
      > server/assembly
   ```
-
 After running package/assembly, pick up the jars from their respective directories. For example, the messages jar shouldn't contain dependencies unless the client code doesn't have scala-library.jar on the path. If it does, then you can build the messages jar for your own client code as follows on the sbt shell:
-
   ```
   sbt messages/package
   ```
-
 and then you can pick up the jar from messages/target/scala-2.10/messages_2.10-0.1.jar. If your client does not have scala-library.jar on its claspath, you can make an assembly file instead
-
   ```
   sbt messages/assembly
   ```
-    
 and you can pick up the jar from messages/target/scala-2.10/messages-assembly-0.1.jar.
-
 The server should be amost surely built using assembly as opposed to package, so you can do
-
   ```
   sbt server/assembly
   ```
-    
 and you can then pick up the jar from server/target/scala-2.10/server-assembly-0.1.jar.
-
 6. The Typesafe config file found in the config subdirectory of this project can be used as a set of defaults for the server. Once you have the server assembly jar and the config file, copy them to any directory you wish. Here I assume that the jar and the config are in the same directory, but they can be different if the config's path is correctly specified as either relative or absolute. For example, for the jar and the config in the same directory, you can start the server as follows:
-
   ```
     java -Dconfig.file=./application.conf -jar ./server-assembly-0.1.jar
   ```
-  
 If the conf file is in a different directory, simply specify the desired path.
-
 7. Note that you can change certain parameters of the Akka R server in the config file. For example, you can choose the server to run on a port different than 2553, and the client to run on a port different than 2552. In fact, you could remove the client section altogether. The minimal server configuration serves as the default.
 
 Final Notes
