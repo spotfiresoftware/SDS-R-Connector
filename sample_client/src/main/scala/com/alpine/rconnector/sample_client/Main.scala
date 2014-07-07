@@ -19,17 +19,6 @@ object Main extends App {
 
   Thread.sleep(5000)
 
-  /*
-    val rScript =
-      """
-        |library(RCurl)
-        |foo = read.csv(text=getURL(url='http://hci.stanford.edu/jheer/workshop/data/worldbank/worldbank.csv'))
-        |bar = sample(x=foo$Energy.use..kg.of.oil.equivalent.per.capita,replace=FALSE, size = 100)
-        |bar = bar[!is.na(bar)]
-        |mean(bar)
-      """.stripMargin
-  */
-
   Thread.sleep(5000)
 
   client ! RStop

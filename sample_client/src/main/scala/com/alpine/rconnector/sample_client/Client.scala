@@ -20,12 +20,12 @@ class Client(val url: String) extends Actor {
   private[this] val remoteMaster = context.actorSelection(url)
 
   // TODO: move this someplace else and choose the right strategy
-  override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
-    //  case _: ArithmeticException => Resume
-    //  case _: NullPointerException => Restart
-    //  case _: IllegalArgumentException => Stop
-    case _ => Escalate
-  }
+  //  override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
+  //    //  case _: ArithmeticException => Resume
+  //    //  case _: NullPointerException => Restart
+  //    //  case _: IllegalArgumentException => Stop
+  //    case _ => Escalate
+  //  }
 
   def receive = {
 
