@@ -105,13 +105,13 @@ If the conf file is in a different directory, simply specify the desired path.
   $sbt messages/publish-local
   ```
 
-or you can publish it in your favorite repository management system, such as Artifactory or Nexus. You will also need to add the correct Akka and Scala library versions to your client project. Currently, the project uses Scala 2.10.3 and Akka 2.3.2, but see if changing the versions will allow the alpine-r project to build, e.g. using sbt server/assembly. Unless versions change, you will need to add these dependencies to your own build.sbt/Build.scala:
+or you can publish it in your favorite repository management system, such as Artifactory or Nexus. You will also need to add the correct Akka and Scala library versions to your client project. Currently, the project uses Scala 2.10.3 and Akka 2.3.2, but see if changing the versions will allow the alpine-r project to build, e.g. using sbt server/assembly. Unless versions change, you will need to add these dependencies to your own build.sbt/Build.scala (here the example is for Build.scala):
 
   ```scala
     scalaVersion := "2.10.3"
     
     lazy val akkaSettings = Seq(
-  	libraryDependencies ++= {
+    	libraryDependencies ++= {
       val akkaVersion = "2.3.2"
   	  Seq(
   	    "com.typesafe.akka"    %%    "akka-actor"                    %    akkaVersion,
@@ -121,10 +121,12 @@ or you can publish it in your favorite repository management system, such as Art
         "com.typesafe.akka"    %%    "akka-kernel"                   %    akkaVersion,
         "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion,
         "com.typesafe.akka"    %%    "akka-persistence-experimental" %    akkaVersion
-  	  )
-    }
-  )
+  	  )}
+    )
   ```
+
+See project/Build.scala for an example.
+
 
 Final Notes
 -----------
