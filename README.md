@@ -60,10 +60,11 @@ You do not need to use the master build file if you do not want to - particularl
        // compile all projects
      > compile 
        // run main class in the sample_client subproject
-       // this also demonstrates exception handling
      > sample_client/run 
-      // run unit tests
+      // run unit tests (currently only for the server)
      > test
+       // package jars without dependencies (will need to be on the classpath)
+     > package
       // assemble "uber jar" file with all dependencies
       // (Scala, Akka, Rserve, message beans, etc.)
      > assembly
@@ -72,7 +73,21 @@ You do not need to use the master build file if you do not want to - particularl
      > server/assembly
   ```
 
+After running package/assembly, pick up the jars from their respective directories. For example, the messages jar shouldn't contain dependencies unless the client code doesn't have scala-library.jar on the path. If it does, then you can build the messages jar for your own client code as follows on the sbt shell:
 
+    ```sbt messages/package```
+
+and then you can pick up the jar from messages/target/scala-2.10/messages_2.10-0.1.jar. If your client does not have scala-library.jar on its claspath, you can make an assembly file instead
+
+    ```sbt messages/assembly```
+    
+and you can pick up the jar from messages/target/scala-2.10/messages-assembly-0.1.jar.
+
+The server should be amost surely built using assembly as opposed to package, so you can do
+
+    ```sbt server/assembly```
+    
+and you can then pick up the jar from server/target/scala-2.10/server-assembly-0.1.jar.
 
 Final Notes
 -----------
