@@ -42,9 +42,11 @@ You do not need to use the master build file if you do not want to - particularl
   - In general, you can simply wget the existing RHEL/Debian and other packages from [here](http://cran.r-project.org/bin/linux/)
   - For other options, see [here](http://cran.r-project.org/mirrors.html).
 2. Run the R script found [here](https://github.com/alpinedatalabs/alpine-r/blob/master/server/scripts/RunRserve.R). It will install the Rserve package from [CRAN]() if it's not already installed, start the Rserve TCP listener, and keep R running until the master R process terminates. For extra protection, use [nohup](http://en.wikipedia.org/wiki/Nohup) as follows:
+
    ```sh
      $nohup R CMD BATCH server/scripts/RunRserve.R ./r_log.txt &
    ```
+   
 3. Check the log file ("r_log.txt" in the above example for failures).
 4. Get SBT 0.13.2 or later (warning, the build was only tested with this specific version). You can find all the information for your OS [here](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html).
 5. Start SBT at the root of the project, i.e. [here](https://github.com/alpinedatalabs/alpine-r). Use the interactive mode the first time to get feedback about each step, instead of having SBT fail one task and shutting down.
