@@ -103,7 +103,7 @@ and you can then pick up the jar from server/target/scala-2.10/server-assembly-0
   
 If the conf file is in a different directory, simply specify the desired path.
 
-7. Note that you can change certain parameters of the Akka R server in the config file. For example, you can choose 
+7. Note that you can change certain parameters of the Akka R server in the config file. For example, you can choose the server to run on a port different than 2553, and the client to run on a port different than 2552. In fact, you could remove the client section altogether. The minimal server configuration serves as the default.
 
 Final Notes
 -----------
