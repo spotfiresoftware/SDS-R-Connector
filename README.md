@@ -93,11 +93,9 @@ The server should be amost surely built using assembly as opposed to package, so
   ```
 and you can then pick up the jar from server/target/scala-2.10/server-assembly-0.1.jar.
 6. The Typesafe config file found in the config subdirectory of this project can be used as a set of defaults for the server. Once you have the server assembly jar and the config file, copy them to any directory you wish. Here I assume that the jar and the config are in the same directory, but they can be different if the config's path is correctly specified as either relative or absolute. For example, for the jar and the config in the same directory, you can start the server as follows:
-
   ```
     java -Dconfig.file=./application.conf -jar ./server-assembly-0.1.jar
   ```
-  
 If the conf file is in a different directory, simply specify the desired path.
 7. Note that you can change certain parameters of the Akka R server in the config file. For example, you can choose the server to run on a port different than 2553, and the client to run on a port different than 2552. In fact, you could remove the client section altogether. The minimal server configuration serves as the default.
 
