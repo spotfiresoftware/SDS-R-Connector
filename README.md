@@ -22,20 +22,24 @@ You do not need to use the master build file if you do not want to - particularl
 1. Install R. This can be done in many ways, e.g.: 
   - CentOS/RHEL:
       - install EPEL, e.g.
+      
         ```sh
           $rpm -ivh http://mirror.chpc.utah.edu/pub/epel/6Server/x86_64/2ping-2.0-2.el6.noarch.rpm
         ```
       - install R
+      
         ```sh
           $yum install R
         ```
   - Fedora:
       - install R
+      
         ```sh
           $yum install R
         ```
   - Ubuntu:
       - install R
+      
         ```
           $sudo apt-get install R
         ```
@@ -50,6 +54,7 @@ You do not need to use the master build file if you do not want to - particularl
 3. Check the log file ("r_log.txt" in the above example for failures).
 4. Get SBT 0.13.2 or later (warning, the build was only tested with this specific version). You can find all the information for your OS [here](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html).
 5. Start SBT at the root of the project, i.e. [here](https://github.com/alpinedatalabs/alpine-r). Use the interactive mode the first time to get feedback about each step, instead of having SBT fail one task and shutting down.
+
    ```sh
     $sbt
        // in case you need to reload the build definition
