@@ -48,7 +48,7 @@ You do not need to use the master build file if you do not want to - particularl
 3. Check the log file ("r_log.txt" in the above example for failures).
 4. Get SBT 0.13.2 or later (warning, the build was only tested with this specific version). You can find all the information for your OS [here](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html).
 5. Start SBT at the root of the project, i.e. [here](https://github.com/alpinedatalabs/alpine-r). Use the interactive mode the first time to get feedback about each step, instead of having SBT fail one task and shutting down.
- ```sh
+   ```sh
     $sbt
        // in case you need to reload the build definition
      > reload 
@@ -70,7 +70,7 @@ You do not need to use the master build file if you do not want to - particularl
       // assemble just the server (with Scala/Akka/Rserve/messages)
       // but without the sample_client code
      > server/assembly
-  ```
+    ```
 After running package/assembly, pick up the jars from their respective directories. For example, the messages jar shouldn't contain dependencies unless the client code doesn't have scala-library.jar on the path. If it does, then you can build the messages jar for your own client code as follows on the sbt shell:
   ```
   sbt messages/package
