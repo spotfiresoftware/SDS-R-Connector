@@ -20,13 +20,4 @@ if (!"Rserve" %in% rownames(installed.packages())) {
 
 # start up Rserve
 library(Rserve)
-Rserve()
-
-# This will fail with a SOCK_ERROR if Rserve is already running
-# To make it idempotent, don't fail, just send a warning to console.
-warnUser = function(x) {print("Can't start Rserve - it's probably already running")}
-tryCatch(
-  expr = Rserve(args = "--no-save"),
-  warning = warnUser,
-  error = warnUser
-)
+Rserve(args = "--no-save")
