@@ -88,12 +88,16 @@ case class FinishRSession(uuid: String) extends Message
  */
 case class AssignAck(uuid: String, variables: Array[String]) extends Message
 
-// case class IsRActorAvailable(uuid: String) extends Message
+/**
+ *
+ * @param uuid
+ */
+case class IsRActorAvailable(uuid: String) extends Message
 
 /**
  *
  */
-// case object AvailableRActorFound extends Message
+case object AvailableRActorFound extends Message
 
 /**
  *
