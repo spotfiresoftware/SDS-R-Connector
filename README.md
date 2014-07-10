@@ -22,34 +22,40 @@ You do not need to use the master build file if you do not want to - particularl
 1. Install R. This can be done in many ways, e.g.: 
   - CentOS/RHEL:
       - install EPEL, e.g.
+      
         ```sh
           $rpm -ivh http://mirror.chpc.utah.edu/pub/epel/6Server/x86_64/2ping-2.0-2.el6.noarch.rpm
         ```
       - install R
+      
         ```sh
           $yum install R
         ```
   - Fedora:
       - install R
+      
         ```sh
           $yum install R
         ```
   - Ubuntu:
       - install R
-        ```
+      
+        ```sh
           $sudo apt-get install R
         ```
   - In general, you can simply wget the existing RHEL/Debian and other packages from [here](http://cran.r-project.org/bin/linux/)
   - For other options, see [here](http://cran.r-project.org/mirrors.html).
 2. Run the R script found [here](https://github.com/alpinedatalabs/alpine-r/blob/master/server/scripts/RunRserve.R). It will install the Rserve package from [CRAN]() if it's not already installed, start the Rserve TCP listener, and keep R running until the master R process terminates. For extra protection, use [nohup](http://en.wikipedia.org/wiki/Nohup) as follows:
+
    ```sh
      $nohup R CMD BATCH server/scripts/RunRserve.R ./r_log.txt &
    ```
+   
 3. Check the log file ("r_log.txt" in the above example for failures).
 4. Get SBT 0.13.2 or later (warning, the build was only tested with this specific version). You can find all the information for your OS [here](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html).
 5. Start SBT at the root of the project, i.e. [here](https://github.com/alpinedatalabs/alpine-r). Use the interactive mode the first time to get feedback about each step, instead of having SBT fail one task and shutting down.
 
- ```sh
+   ```sh
     $sbt
        // in case you need to reload the build definition
      > reload 
@@ -60,18 +66,66 @@ You do not need to use the master build file if you do not want to - particularl
        // compile all projects
      > compile 
        // run main class in the sample_client subproject
-       // this also demonstrates exception handling
      > sample_client/run 
-      // run unit tests
+      // run unit tests (currently only for the server)
      > test
+       // package jars without dependencies (will need to be on the classpath)
+     > package
       // assemble "uber jar" file with all dependencies
       // (Scala, Akka, Rserve, message beans, etc.)
      > assembly
       // assemble just the server (with Scala/Akka/Rserve/messages)
       // but without the sample_client code
      > server/assembly
+    ```
+After running package/assembly, pick up the jars from their respective directories. For example, the messages jar shouldn't contain dependencies unless the client code doesn't have scala-library.jar on the path. If it does, then you can build the messages jar for your own client code as follows on the sbt shell:
+  ```sh
+  $sbt messages/package
+  ```
+and then you can pick up the jar from messages/target/scala-2.10/messages_2.10-0.1.jar. If your client does not have scala-library.jar on its claspath, you can make an assembly file instead
+  ```sh
+  $sbt messages/assembly
+  ```
+and you can pick up the jar from messages/target/scala-2.10/messages-assembly-0.1.jar.
+The server should be amost surely built using assembly as opposed to package, so you can do
+  ```sh
+  $sbt server/assembly
+  ```
+and you can then pick up the jar from server/target/scala-2.10/server-assembly-0.1.jar.
+6. The Typesafe config file found in the config subdirectory of this project can be used as a set of defaults for the server. Once you have the server assembly jar and the config file, copy them to any directory you wish. Here I assume that the jar and the config are in the same directory, but they can be different if the config's path is correctly specified as either relative or absolute. For example, for the jar and the config in the same directory, you can start the server as follows:
+
+  ```sh
+    $java -Dconfig.file=./application.conf -jar ./server-assembly-0.1.jar
+  ```
+If the conf file is in a different directory, simply specify the desired path.
+7. Note that you can change certain parameters of the Akka R server in the config file. For example, you can choose the server to run on a port different than 2553, and the client to run on a port different than 2552. In fact, you could remove the client section altogether. The minimal server configuration serves as the default.
+8. For your own client code builds, you will need the message jar and the Akka library. The code found in the client/ subproject shows an example. You can publish the messages jar in your local SBT/ivy2 repository using sbt
+
+  ```sh
+  $sbt messages/publish-local
   ```
 
+or you can publish it in your favorite repository management system, such as Artifactory or Nexus. You will also need to add the correct Akka and Scala library versions to your client project. Currently, the project uses Scala 2.10.3 and Akka 2.3.2, but see if changing the versions will allow the alpine-r project to build, e.g. using sbt server/assembly. Unless versions change, you will need to add these dependencies to your own build.sbt/Build.scala (here the example is for Build.scala):
+
+  ```scala
+    scalaVersion := "2.10.3"
+    
+    lazy val akkaSettings = Seq(
+    	libraryDependencies ++= {
+      val akkaVersion = "2.3.2"
+  	  Seq(
+  	    "com.typesafe.akka"    %%    "akka-actor"                    %    akkaVersion,
+        "com.typesafe.akka"    %%    "akka-remote"                   %    akkaVersion,
+        "com.typesafe.akka"    %%    "akka-slf4j"                    %    akkaVersion,
+        "com.typesafe.akka"    %%    "akka-testkit"                  %    akkaVersion,
+        "com.typesafe.akka"    %%    "akka-kernel"                   %    akkaVersion,
+        "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion,
+        "com.typesafe.akka"    %%    "akka-persistence-experimental" %    akkaVersion
+  	  )}
+    )
+  ```
+
+See project/Build.scala for an example.
 
 
 Final Notes
