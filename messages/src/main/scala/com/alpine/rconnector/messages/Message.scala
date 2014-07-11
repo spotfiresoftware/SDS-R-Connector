@@ -109,3 +109,25 @@ case object RActorIsNotAvailable extends Message
  * @param uuid
  */
 case class RSessionFinishedAck(uuid: String) extends Message
+
+/**
+ *
+ */
+case object GetMaxRWorkerCount extends Message
+
+/**
+ *
+ * @param i
+ */
+case class MaxRWorkerCount(i: Int) extends Message
+
+/**
+ *
+ */
+case object GetFreeRWorkerCount extends Message
+
+/**
+ *
+ * @param i
+ */
+case class FreeRWorkerCount(i: Int) extends Message

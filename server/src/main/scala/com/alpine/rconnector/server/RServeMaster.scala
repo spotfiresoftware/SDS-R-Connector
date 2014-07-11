@@ -96,6 +96,15 @@ class RServeMaster extends Actor {
   /* The main message-processing method of the actor */
   def receive: Receive = {
 
+    case x @ IsRActorAvailable(uuid) => {
+
+      resolveActor(uuid) match {
+        case Some(ref) => sender ! AvailableRActorFound
+        case None => sender ! RActorIsNotAvailable
+      }
+
+    }
+
     case x @ RRequest(uuid, _, _) => {
 
       log.info(s"\n\nRServeMaster: received RRequest request and routing it to RServe actor\n\n")
@@ -147,6 +156,18 @@ class RServeMaster extends Actor {
 
       sessionMap(uuid).tell(x, sender)
       sessionMap -= uuid
+    }
+
+    /* Get maximum number of R workers (to set the client's blocking queue size */
+    case GetMaxRWorkerCount => {
+
+      sender ! MaxRWorkerCount(numRoutees)
+    }
+
+    /* In case the client wants to know how many workers are free, e.g. for resource monitoring */
+    case GetFreeRWorkerCount => {
+
+      sender ! FreeRWorkerCount(numRoutees - sessionMap.keySet.size)
     }
   }
 
