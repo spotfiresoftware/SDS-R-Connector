@@ -52,15 +52,15 @@ object AlpineRConnectorBuild extends Build {
 
   lazy val akkaSettings = Seq(
   	libraryDependencies ++= {
-      val akkaVersion = "2.3.2"
+      val akkaVersion = "2.2.3"
   	  Seq(
   	    "com.typesafe.akka"    %%    "akka-actor"                    %    akkaVersion,
         "com.typesafe.akka"    %%    "akka-remote"                   %    akkaVersion,
         "com.typesafe.akka"    %%    "akka-slf4j"                    %    akkaVersion,
         "com.typesafe.akka"    %%    "akka-testkit"                  %    akkaVersion,
         "com.typesafe.akka"    %%    "akka-kernel"                   %    akkaVersion,
-        "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion,
-        "com.typesafe.akka"    %%    "akka-persistence-experimental" %    akkaVersion
+        "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion
+      //  "com.typesafe.akka"    %%    "akka-persistence-experimental" %    akkaVersion
   	  )
     }
   )
