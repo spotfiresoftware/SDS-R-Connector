@@ -54,10 +54,10 @@ object AlpineRConnectorBuild extends Build {
   	libraryDependencies ++= {
       val akkaVer = "2.2.3"
   	  Seq(
-  	    "com.typesafe.akka"    %%    "akka-actor"                    %    s"$akkaVer-shaded-protobuf",  // akkaVertion
-        "com.typesafe.akka"    %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
-        "com.typesafe.akka"    %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
-        "com.typesafe.akka"    %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test"
+  	    "org.spark-project.akka"    %%    "akka-actor"                    %    s"$akkaVer-shaded-protobuf",  // akkaVertion
+        "org.spark-project.akka"    %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
+        "org.spark-project.akka"    %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
+        "org.spark-project.akka"    %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test"
       //  "com.typesafe.akka"    %%    "akka-kernel"                   %    akkaVersion,
       //  "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion
       //  "com.typesafe.akka"    %%    "akka-persistence-experimental" %    akkaVersion
