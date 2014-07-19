@@ -17,6 +17,7 @@
 
 package com.alpine.rconnector.messages
 
+import akka.actor.ActorRef
 import java.util.{ Map => JMap }
 
 /**
@@ -131,3 +132,62 @@ case object GetFreeRWorkerCount extends Message
  * @param i
  */
 case class FreeRWorkerCount(i: Int) extends Message
+
+/**
+ *
+ * @param sessionUuid
+ * @param datasetUuid
+ */
+case class StartTx(sessionUuid: String, datasetUuid: String) extends Message
+
+/**
+ *
+ * @param sessionUuid
+ * @param datasetUuid
+ */
+case class StartTxAck(sessionUuid: String, datasetUuid: String) extends Message
+
+/**
+ *
+ * @param sessionUuid
+ * @param datasetUuid
+ */
+case class EndTx(sessionUuid: String, datasetUuid: String) extends Message
+
+/**
+ *
+ * @param datasetUuid
+ */
+case class EndTxAck(sessionUuid: String, datasetUuid: String) extends Message
+
+/**
+ *
+ */
+sealed trait Packet extends Message
+
+/**
+ *
+ * @param sessionUuid
+ * @param datasetUuid
+ * @param packetUuid
+ * @param payload
+ */
+case class CsvPacket(sessionUuid: String, datasetUuid: String, packetUuid: String, payload: String) extends Packet
+
+/**
+ *
+ * @param sessionUuid
+ * @param datasetUuid
+ * @param packetUuid
+ */
+case class CsvPacketAck(sessionUuid: String, datasetUuid: String, packetUuid: String) extends Message
+
+/**
+ *
+ * @param sessionUuid
+ * @param datasetUuid
+ * @param packetUuid
+ * @param payload
+ */
+case class MapPacket(sessionUuid: String, datasetUuid: String, packetUuid: String, payload: Map[String, Any]) extends Message
+

@@ -75,7 +75,7 @@ object AlpineRConnectorBuild extends Build {
      }).settings(
       addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
   
-  lazy val messages = project.settings(sharedSettings)
+  lazy val messages = project.settings(sharedSettings ++ akkaSettings)
 
   lazy val server = project
     .dependsOn(messages)

@@ -94,7 +94,7 @@ object MocksAndFixtures {
 
   }
 
-  implicit val rServeMaster = TestActorRef(new MockRServeMaster())
+  val rServeMaster = TestActorRef(new MockRServeMaster())
 
   val duration = 30 seconds
   implicit val timeout = Timeout(duration)

@@ -27,6 +27,7 @@ import com.alpine.rconnector.messages.RResponse
 import com.alpine.rconnector.messages.RRequest
 import com.alpine.rconnector.messages.FinishRSession
 import java.util.{ Map => JMap }
+import scala.collection.mutable.{ HashMap => MutableHashMap }
 
 /**
  * This is the actor that establishes a connection to R via Rserve
@@ -41,6 +42,9 @@ class RServeActor extends Actor {
   private[this] implicit val log = Logging(context.system, this)
 
   protected[this] val conn: RConnection = new RConnection()
+
+  // Map of datasetUuid -> sessionUuid
+  private[this] val txMap = MutableHashMap[String, String]()
 
   logActorStart(this)
 
@@ -87,6 +91,23 @@ class RServeActor extends Actor {
       log.info(s"""\n\nAssigned the following variables to the R workspace for session $clientUUID:\n
                    ${dataFrames.keySet} """)
       sender ! AssignAck(clientUUID, dataFrames.keySet.map(_.toString).toArray)
+    }
+
+    case StartTx(sessionUuid, datasetUuid) => {
+      txMap += datasetUuid -> sessionUuid
+      // open file connection
+      sender ! StartTxAck(sessionUuid, datasetUuid)
+    }
+
+    case EndTx(sessionUuid, datasetUuid) => {
+      txMap -= datasetUuid
+      // close file connection and mark the data as being OK to be read from R
+      // (note the path to enrich the R script)
+      sender ! EndTx(sessionUuid, datasetUuid)
+    }
+
+    case CsvPacket(sessionUuid, datasetUuid, packetUuid, payload) => {
+      // write packet to disk
     }
 
     case FinishRSession(uuid) => {

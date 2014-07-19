@@ -149,6 +149,39 @@ class RServeMaster extends Actor {
       sender ! StopAck
     }
 
+    case x @ StartTx(sessionUuid, datasetUuid) => {
+
+      log.info(s"\n\nMaster: got StartTx request for session $sessionUuid for dataset $datasetUuid\n\n")
+      resolveActor(sessionUuid) match {
+        case Some(ref) => ref.tell(x, sender)
+        case None => sender ! RActorIsNotAvailable
+      }
+    }
+
+    case x @ EndTx(sessionUuid, datasetUuid) => {
+      log.info(s"\n\nMaster: got EndTx request for session $sessionUuid for dataset $datasetUuid\n\n")
+      resolveActor(sessionUuid) match {
+        case Some(ref) => ref.tell(x, sender)
+        case None => sender ! RActorIsNotAvailable
+      }
+    }
+
+    case x @ CsvPacket(sessionUuid, datasetUuid, packetUuid, payload) => {
+      log.info(s"\n\nMaster: got CsvPacket for session $sessionUuid for dataset $datasetUuid\n\n")
+      resolveActor(sessionUuid) match {
+        case Some(ref) => ref.tell(x, sender)
+        case None => sender ! RActorIsNotAvailable
+      }
+    }
+
+    case x @ MapPacket(sessionUuid, datasetUuid, packetUuid, payload) => {
+      log.info(s"\n\nMaster: got MapPacket for session $sessionUuid for dataset $datasetUuid\n\n")
+      resolveActor(sessionUuid) match {
+        case Some(ref) => ref.tell(x, sender)
+        case None => sender ! RActorIsNotAvailable
+      }
+    }
+
     /* Unbind an individual R session */
     case x @ FinishRSession(uuid) => {
 

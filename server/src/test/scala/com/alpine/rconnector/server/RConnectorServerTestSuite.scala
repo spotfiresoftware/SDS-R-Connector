@@ -17,6 +17,7 @@ package com.alpine.rconnector.server
 
 import akka.actor.ActorRef
 import com.alpine.rconnector.messages._
+import com.alpine.rconnector.server.MocksAndFixtures._
 import org.rosuda.REngine.Rserve.RserveException
 import org.scalatest.{ BeforeAndAfterAll, FunSpec, Matchers }
 import scala.collection.JavaConversions._
@@ -41,7 +42,7 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
     import MocksAndFixtures.{ arrX, badRCode, mean, meanResultMsg, mockRServeActor, rExpNull, RichMessage, uuid }
 
-    implicit val ref: ActorRef = mockRServeActor
+    implicit val ref = mockRServeActor
 
     it("should correctly calculate the mean of 1:10") {
 
@@ -111,6 +112,8 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
     import MocksAndFixtures.{ arrX, mean, meanResultMsg, RichMessage, rServeMaster, uuid }
 
+    implicit val ref = rServeMaster
+
     it("""should route requests to RServeActor via the
          router and RServeActorSuperviso and get back messages""") {
 
@@ -132,6 +135,10 @@ class RConnectorServerTestSuite extends FunSpec with Matchers with BeforeAndAfte
 
       RRequest(uuid, mean, arrX).get should be(meanResultMsg)
     }
+
+    //  it("should be able to get exception messages from the R worker") {
+    //    RRequest(uuid, badRCode, Array("badRCode")).get.getClass should be(classOf[RException])
+    //  }
 
     it("should be able to reject requests when all R workers are busy") {
 
