@@ -20,7 +20,8 @@ import akka.AkkaException
 import akka.actor.Actor
 import com.alpine.rconnector.messages._
 import akka.event.Logging
-// import org.rosuda.REngine.REXP
+import org.rosuda.REngine.REXP
+import org.rosuda.REngine.Rserve.RserveException
 import scala.collection.JavaConversions._
 import com.alpine.rconnector.messages.RException
 import com.alpine.rconnector.messages.RResponse
@@ -41,7 +42,7 @@ class RServeActor extends Actor {
 
   private[this] implicit val log = Logging(context.system, this)
 
-  protected[this] val conn: RConnection = new RConnection()
+  protected[this] var conn: RConnection = new RConnection()
 
   // Map of datasetUuid -> sessionUuid
   private[this] val txMap = MutableHashMap[String, String]()
@@ -67,11 +68,24 @@ class RServeActor extends Actor {
 
     case RRequest(clientUUID, rScript, returnSet: Array[String]) => {
 
-      def eval(s: String) = conn.eval(s).asNativeJavaObject // .asInstanceOf[REXP].asNativeJavaObject
+      def eval(s: String): java.lang.Object = {
+        val enrichedScript =
 
-      // first eval rScript
-      log.info("\n\nEvaluating R Script\n\n")
-      conn.eval(rScript)
+          s"""try({
+                         $s
+                       },
+                       silent=TRUE)""".stripMargin
+        //  log.info(s"\n\enrichedScript:\n\n$enrichedScript\n\n")
+        log.info(s"\n\nEvaluating $enrichedScript\n\n")
+        val res: REXP = conn.parseAndEval(enrichedScript) // eval
+        if (res.inherits("try-error")) {
+          throw new RserveException(conn, res.asString)
+        }
+        res.asNativeJavaObject
+      }
+
+      // evaluate R script
+      eval(rScript)
 
       val results = returnSet.map(elem => (elem, eval(elem))).toMap
 
@@ -93,7 +107,7 @@ class RServeActor extends Actor {
       sender ! AssignAck(clientUUID, dataFrames.keySet.map(_.toString).toArray)
     }
 
-    case StartTx(sessionUuid, datasetUuid) => {
+    case StartTx(sessionUuid, datasetUuid, columnNames) => {
       txMap += datasetUuid -> sessionUuid
       // open file connection
       sender ! StartTxAck(sessionUuid, datasetUuid)
@@ -106,14 +120,15 @@ class RServeActor extends Actor {
       sender ! EndTx(sessionUuid, datasetUuid)
     }
 
-    case CsvPacket(sessionUuid, datasetUuid, packetUuid, payload) => {
+    case DelimitedPacket(sessionUuid, datasetUuid, packetUuid, payload, delimiter) => {
       // write packet to disk
     }
 
     case FinishRSession(uuid) => {
 
       log.info(s"Finishing R session for UUID $uuid")
-      clearWorkspace()
+      conn.detach()
+      conn = new RConnection()
       sender ! RSessionFinishedAck(uuid)
     }
 

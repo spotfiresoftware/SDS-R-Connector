@@ -38,8 +38,9 @@ class RServeActorSupervisor extends Actor {
 
     /* Capture the known exceptions, log the failure and restart actor.
        The actor being restarted will tell the sender about the failure. */
-    case e @ (_: RserveException | _: REngineException |
-      _: REngineEvalException | _: REXPMismatchException) => {
+    case e: Throwable => {
+      //  (_: RserveException | _: REngineException |
+      //  _: REngineEvalException | _: REXPMismatchException) => {
       logFailure(e)
       Restart
     }

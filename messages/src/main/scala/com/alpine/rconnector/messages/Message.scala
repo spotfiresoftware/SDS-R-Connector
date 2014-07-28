@@ -138,7 +138,7 @@ case class FreeRWorkerCount(i: Int) extends Message
  * @param sessionUuid
  * @param datasetUuid
  */
-case class StartTx(sessionUuid: String, datasetUuid: String) extends Message
+case class StartTx(sessionUuid: String, datasetUuid: String, columnNames: Array[String]) extends Message
 
 /**
  *
@@ -169,25 +169,27 @@ sealed trait Packet extends Message
  *
  * @param sessionUuid
  * @param datasetUuid
- * @param packetUuid
+ * @param packetSerialID
  * @param payload
  */
-case class CsvPacket(sessionUuid: String, datasetUuid: String, packetUuid: String, payload: String) extends Packet
+case class DelimitedPacket(sessionUuid: String, datasetUuid: String, packetSerialID: Long,
+  payload: String, delimiter: String = ",") extends Packet
 
 /**
  *
  * @param sessionUuid
  * @param datasetUuid
- * @param packetUuid
+ * @param packetSerialID
  */
-case class CsvPacketAck(sessionUuid: String, datasetUuid: String, packetUuid: String) extends Message
+case class DelimitedPacketAck(sessionUuid: String, datasetUuid: String, packetSerialID: Long) extends Message
 
 /**
  *
  * @param sessionUuid
  * @param datasetUuid
- * @param packetUuid
+ * @param packetSerialID
  * @param payload
  */
-case class MapPacket(sessionUuid: String, datasetUuid: String, packetUuid: String, payload: Map[String, Any]) extends Message
+case class MapPacket(sessionUuid: String, datasetUuid: String, packetSerialID: Long,
+  payload: Map[String, Any]) extends Message
 

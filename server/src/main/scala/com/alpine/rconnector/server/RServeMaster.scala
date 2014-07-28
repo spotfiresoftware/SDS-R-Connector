@@ -15,6 +15,8 @@
 
 package com.alpine.rconnector.server
 
+import java.util.{ Timer, TimerTask }
+
 import akka.actor._
 import akka.event.Logging
 import com.alpine.rconnector.messages._
@@ -38,8 +40,10 @@ class RServeMaster extends Actor {
 
   private val config = ConfigFactory.load().getConfig("rServeKernelApp")
   protected val numRoutees = config.getInt("akka.rServe.numActors")
+  protected val timeoutMillis = config.getInt("akka.rserve.timeoutMillis")
 
-  log.info(s"\n\nnumActors = $numRoutees\n\n")
+  log.info(s"\n\nNumber of expected R workers = $numRoutees\n\n")
+  log.info(s"\n\nMaximum R session duration (ms): $timeoutMillis\n\n")
 
   /* rServeRouter is a var because the RServeMaster may keep on running while
   the RServeActors may be shut down by the client by sending the RStop
@@ -51,8 +55,13 @@ class RServeMaster extends Actor {
      or to restart when the RStart message is received, after a prior
      receipt of the RStop message.
    */
-  protected def createRServeRouter(): Option[Vector[ActorRef]] =
+  protected def createRServeRouter(): Option[Vector[ActorRef]] = {
+    log.info(s"\nCreating R server router with $numRoutees actors")
     Some(Vector.fill(numRoutees)(context.actorOf(Props[RServeActorSupervisor])))
+  }
+
+  private def availableActors =
+    rServeRouter.map(_.toSet &~ sessionMap.values.toSet)
 
   /* Map to hold session UUID keys and corresponding ActorRef values.
      This allows the R session to be sticky and for the messages from the client
@@ -76,7 +85,9 @@ class RServeMaster extends Actor {
 
     } else {
 
-      val availableActors = rServeRouter.map(_.toSet &~ sessionMap.values.toSet)
+      //   val availableActors = rServeRouter.map(_.toSet &~ sessionMap.values.toSet)
+
+      log.info(s"\nNo bound actors for session $uuid found - picking available actor from $availableActors\n")
 
       availableActors match {
 
@@ -85,12 +96,32 @@ class RServeMaster extends Actor {
           val unusedActor = set.head
           log.info(s"\n\nFound unused actor for session $uuid - it is $unusedActor\n\n")
           sessionMap += (uuid -> unusedActor)
+          setTimeoutTimerForUUID(uuid, timeoutMillis)
           Some(unusedActor)
         }
 
-        case _ => None
+        case _ => {
+          log.info(s"No available actor found for session $uuid")
+          None
+        }
       }
     }
+  }
+
+  /*
+   Time out in case the session hasn't been unbound by now
+   (including if Alpine crashed but the Akka R server is running)
+   */
+  private def setTimeoutTimerForUUID(uuid: String, timeoutMillis: Long): Unit = {
+    val tt = new TimerTask {
+      override def run(): Unit = {
+        sessionMap.get(uuid).map(_ ! FinishRSession(uuid))
+        // wait for unbinding
+        Thread.sleep(5000)
+        sessionMap.remove(uuid)
+      }
+    }
+    new Timer(uuid).schedule(tt, timeoutMillis)
   }
 
   /* The main message-processing method of the actor */
@@ -99,31 +130,43 @@ class RServeMaster extends Actor {
     case x @ IsRActorAvailable(uuid) => {
 
       resolveActor(uuid) match {
-        case Some(ref) => sender ! AvailableRActorFound
-        case None => sender ! RActorIsNotAvailable
+        case Some(ref) => {
+          log.info(s"\n\nIsRActorAvailable: yes\n\n")
+          sender ! AvailableRActorFound
+        }
+        case None => {
+          log.info(s"\n\nIsRActorAvailable: no\n\n")
+          sender ! RActorIsNotAvailable
+        }
       }
 
     }
 
-    case x @ RRequest(uuid, _, _) => {
+    case x @ RRequest(uuid, rScript, returnSet) => {
 
       log.info(s"\n\nRServeMaster: received RRequest request and routing it to RServe actor\n\n")
 
       resolveActor(uuid) match {
 
         case Some(ref) => ref.tell(x, sender)
-        case None => sender ! RActorIsNotAvailable
+        case None => {
+          log.info(s"\n\nRRequest: R actor is not available\n\n")
+          sender ! RActorIsNotAvailable
+        }
       }
     }
 
-    case x @ RAssign(uuid, _) => {
+    case x @ RAssign(uuid, dataFrames) => {
 
       log.info(s"\n\nRServeMaster: received RAssign request and routing it to RServe actor\n\n")
 
       resolveActor(uuid) match {
 
         case Some(ref) => ref.tell(x, sender)
-        case None => sender ! RActorIsNotAvailable
+        case None => {
+          log.info(s"\n\nRAssign: R actor is not available\n\n")
+          sender ! RActorIsNotAvailable
+        }
       }
     }
 
@@ -132,7 +175,12 @@ class RServeMaster extends Actor {
 
       log.info(s"\n\nMaster: Starting router\n\n")
 
-      rServeRouter = createRServeRouter()
+      if (rServeRouter == None) {
+        rServeRouter = createRServeRouter()
+        log.info(s"\n\nRStart: created router\n\n")
+      } else {
+        log.info(s"\n\nR actor router was already started, ignoring request to start\n\n")
+      }
       sender ! StartAck
     }
 
@@ -149,7 +197,7 @@ class RServeMaster extends Actor {
       sender ! StopAck
     }
 
-    case x @ StartTx(sessionUuid, datasetUuid) => {
+    case x @ StartTx(sessionUuid, datasetUuid, columnNammes) => {
 
       log.info(s"\n\nMaster: got StartTx request for session $sessionUuid for dataset $datasetUuid\n\n")
       resolveActor(sessionUuid) match {
@@ -166,7 +214,7 @@ class RServeMaster extends Actor {
       }
     }
 
-    case x @ CsvPacket(sessionUuid, datasetUuid, packetUuid, payload) => {
+    case x @ DelimitedPacket(sessionUuid, datasetUuid, packetUuid, payload, delimiter) => {
       log.info(s"\n\nMaster: got CsvPacket for session $sessionUuid for dataset $datasetUuid\n\n")
       resolveActor(sessionUuid) match {
         case Some(ref) => ref.tell(x, sender)
@@ -186,20 +234,24 @@ class RServeMaster extends Actor {
     case x @ FinishRSession(uuid) => {
 
       log.info(s"\n\nFinishing R session for client ID $uuid\n\n")
+      log.info(s"\nAvailable actors before unbinding: $availableActors\n\n")
 
-      sessionMap(uuid).tell(x, sender)
-      sessionMap -= uuid
+      sessionMap.get(uuid).map(_.tell(x, sender))
+      sessionMap.remove(uuid)
+      log.info(s"\n\nR session $uuid unbound from R actor router\n")
+      log.info(s"\nAvailable actors after unbinding: $availableActors\n\n")
     }
 
     /* Get maximum number of R workers (to set the client's blocking queue size */
     case GetMaxRWorkerCount => {
 
+      log.info(s"\n\nGetMaxRWorkerCount: ${numRoutees}\n\n")
       sender ! MaxRWorkerCount(numRoutees)
     }
 
     /* In case the client wants to know how many workers are free, e.g. for resource monitoring */
     case GetFreeRWorkerCount => {
-
+      log.info(s"\n\nGetFreeRWorkerCount: ${numRoutees - sessionMap.keySet.size}\n\n")
       sender ! FreeRWorkerCount(numRoutees - sessionMap.keySet.size)
     }
   }
