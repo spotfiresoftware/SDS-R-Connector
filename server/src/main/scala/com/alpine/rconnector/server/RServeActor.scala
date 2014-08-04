@@ -101,7 +101,15 @@ class RServeActor extends Actor {
     case RAssign(clientUUID: String, dataFrames: JMap[_, _]) => {
 
       // asInstanceOf[JMap[String, String]].foreach { elem => conn.assign(elem._1, elem._2) }
-      dataFrames.foreach { elem => conn.assign(elem._1, elem._2) }
+      dataFrames.foreach { elem =>
+        elem match {
+          case (x, y: String) => conn.assign(x, y)
+          case (x, y: Array[Byte]) => conn.assign(x, y)
+          case (x, y) => throw new IllegalStateException(
+            s"Unsupported type of value $x Expected either String or Array[Byte] but got ${y.getClass.getName}"
+          )
+        }
+      }
       log.info(s"""\n\nAssigned the following variables to the R workspace for session $clientUUID:\n
                    ${dataFrames.keySet} """)
       sender ! AssignAck(clientUUID, dataFrames.keySet.map(_.toString).toArray)

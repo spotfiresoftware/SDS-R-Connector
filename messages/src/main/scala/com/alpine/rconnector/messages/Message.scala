@@ -41,7 +41,7 @@ case class RRequest(clientUUID: String, rScript: String, returnSet: Array[_]) ex
  *
  * @param dataFrames
  */
-case class RAssign(uuid: String, dataFrames: JMap[String, String]) extends Message
+case class RAssign(uuid: String, dataFrames: JMap[String, Any]) extends Message
 
 /**
  * Response from R to Scala/Java

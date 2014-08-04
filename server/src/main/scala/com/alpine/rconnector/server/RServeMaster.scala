@@ -40,7 +40,7 @@ class RServeMaster extends Actor {
 
   private val config = ConfigFactory.load().getConfig("rServeKernelApp")
   protected val numRoutees = config.getInt("akka.rServe.numActors")
-  protected val timeoutMillis = config.getInt("akka.rserve.timeoutMillis")
+  protected val timeoutMillis = config.getInt("akka.rServe.timeoutMillis")
 
   log.info(s"\n\nNumber of expected R workers = $numRoutees\n\n")
   log.info(s"\n\nMaximum R session duration (ms): $timeoutMillis\n\n")
