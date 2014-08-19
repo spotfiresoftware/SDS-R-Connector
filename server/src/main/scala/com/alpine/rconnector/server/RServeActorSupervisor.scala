@@ -21,6 +21,7 @@ import org.rosuda.REngine.{ REXPMismatchException, REngineEvalException, REngine
 import akka.actor.SupervisorStrategy.{ Escalate, Restart }
 import scala.concurrent.duration._
 import akka.event.Logging
+import akka.actor.ActorKilledException
 
 /**
  * This actor supervises individual RServeActors. Without supervision, each RServeActor
@@ -38,9 +39,9 @@ class RServeActorSupervisor extends Actor {
 
     /* Capture the known exceptions, log the failure and restart actor.
        The actor being restarted will tell the sender about the failure. */
-    case e: Throwable => {
-      //  (_: RserveException | _: REngineException |
-      //  _: REngineEvalException | _: REXPMismatchException) => {
+    case e @ (_: RserveException | _: REngineException |
+      _: REngineEvalException | _: REXPMismatchException |
+      _: ActorKilledException) => {
       logFailure(e)
       Restart
     }

@@ -20,6 +20,8 @@ package com.alpine.rconnector.messages
 import akka.actor.ActorRef
 import java.util.{ Map => JMap }
 
+import scala.beans.BeanProperty
+
 /**
  * Messages for communication between Alpine's backend and the R server.
  * <p>
@@ -193,3 +195,16 @@ case class DelimitedPacketAck(sessionUuid: String, datasetUuid: String, packetSe
 case class MapPacket(sessionUuid: String, datasetUuid: String, packetSerialID: Long,
   payload: Map[String, Any]) extends Message
 
+case object RemoteFrameSizeRequest extends Message
+
+case class RemoteFrameSizeResponse(sizeBytes: Long) extends Message
+
+case class ClientHeartbeatRequest(uuid: String) extends Message
+
+case class ServerHeartbeatReponse(uuid: String) extends Message
+
+case class ServerHeartbeatRequest(uuid: String) extends Message
+
+case class ClientHeartbeatResponse(uuid: String) extends Message
+
+case class RegisterRemoteActor(ref: ActorRef) extends Message

@@ -140,6 +140,11 @@ class RServeActor extends Actor {
       sender ! RSessionFinishedAck(uuid)
     }
 
+    case ClientHeartbeatRequest(uuid) => {
+      log.info(s"\nSending heartbeat response to $uuid\n")
+      sender ! ServerHeartbeatReponse(uuid)
+    }
+
     case other => throw new AkkaException(s"Unexpected message of type ${other.getClass.getName} from $sender")
 
   }
