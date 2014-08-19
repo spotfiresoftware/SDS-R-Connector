@@ -207,4 +207,6 @@ case class ServerHeartbeatRequest(uuid: String) extends Message
 
 case class ClientHeartbeatResponse(uuid: String) extends Message
 
-case class RegisterRemoteActor(ref: ActorRef) extends Message
+case object RegisterRemoteActor extends Message
+
+case object RemoteActorRegistered extends Message

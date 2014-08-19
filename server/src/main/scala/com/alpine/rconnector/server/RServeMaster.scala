@@ -22,7 +22,11 @@ import akka.event.Logging
 import com.alpine.rconnector.messages._
 import com.alpine.rconnector.messages.RRequest
 import com.typesafe.config.ConfigFactory
+import org.rosuda.REngine.{ REXPMismatchException, REngineEvalException, REngineException }
+import org.rosuda.REngine.Rserve.RserveException
 import scala.collection.mutable.HashMap
+import scala.concurrent.duration._
+import akka.actor.SupervisorStrategy.{ Escalate, Restart, Stop }
 
 /**
  * This class does the routing of requests from clients to the RServeActor, which then
@@ -37,6 +41,20 @@ class RServeMaster extends Actor {
   private implicit val log = Logging(context.system, this)
 
   logActorStart(this)
+
+  override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
+
+    case e @ (_: ActorInitializationException) => {
+      logFailure(e)
+      Stop
+    }
+    case e @ (_: Exception) => {
+      logFailure(e)
+      Restart
+    }
+
+    case e @ (_: Throwable) => Escalate
+  }
 
   private val config = ConfigFactory.load().getConfig("rServeKernelApp")
   protected val numRoutees = config.getInt("akka.rServe.numActors")
@@ -140,9 +158,10 @@ class RServeMaster extends Actor {
   /* The main message-processing method of the actor */
   def receive: Receive = {
 
-    case x @ RegisterRemoteActor(ref) => {
-      log.info(s"\n\nRegistering remote actor $ref for heartbeat\n\n")
-      context.watch(ref)
+    case x @ RegisterRemoteActor => {
+      log.info(s"\n\nRegistering remote actor $sender for heartbeat\n\n")
+      context.watch(sender)
+      sender ! RemoteActorRegistered
     }
 
     case x @ Terminated(ref) => {
