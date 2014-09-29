@@ -210,3 +210,5 @@ case class ClientHeartbeatResponse(uuid: String) extends Message
 case object RegisterRemoteActor extends Message
 
 case object RemoteActorRegistered extends Message
+
+case class PId(pid: Int) extends Message

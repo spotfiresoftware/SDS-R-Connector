@@ -50,6 +50,7 @@ class RServeActor extends Actor {
 
     conn = new RConnection()
     pid = conn.eval("Sys.getpid()").asNativeJavaObject.asInstanceOf[Array[Int]](0)
+    context.parent ! PId(pid)
   }
 
   override def preStart(): Unit = updateConnAndPid()
