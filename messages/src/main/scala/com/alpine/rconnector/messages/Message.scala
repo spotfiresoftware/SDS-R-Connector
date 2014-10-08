@@ -55,7 +55,7 @@ case class RResponse(map: Map[String, Any]) extends Message
  *
  * R exception message
  */
-case class RException(message: String) extends Message
+case class RException(exception: Throwable) extends Message
 
 /**
  * Request that the Akka server start the R runtimes.

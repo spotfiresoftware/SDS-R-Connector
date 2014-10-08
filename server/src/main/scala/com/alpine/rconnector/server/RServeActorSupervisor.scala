@@ -44,7 +44,9 @@ class RServeActorSupervisor extends Actor {
     /* Capture the known exceptions, log the failure and restart actor.
        The actor being restarted will tell the sender about the failure. */
     case e @ (_: RserveException | _: REngineException |
-      _: REngineEvalException | _: REXPMismatchException) => {
+      _: REngineEvalException | _: REXPMismatchException |
+      _: RuntimeException
+      ) => {
 
       e.printStackTrace()
       logFailure(e)
@@ -71,7 +73,7 @@ class RServeActorSupervisor extends Actor {
 
     /* This is just the RException sent due to the actor being killed by the supervisor.
        We can ignore it. */
-    case RException(msg) => {
+    case RException(t) => {
     }
 
     case msg: Any => rServe.tell(msg, sender)

@@ -67,7 +67,7 @@ class RServeActor extends Actor {
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // send message about exception to the client (e.g. for UI reporting)
-    sender ! RException(failure(t = reason, text = "R Server Error"))
+    sender ! RException(reason)
     killRProcess()
     //conn.close()
     super.preRestart(reason, message)
@@ -94,7 +94,7 @@ class RServeActor extends Actor {
         log.info(s"\n\nEvaluating $enrichedScript\n\n")
         val res: REXP = conn.parseAndEval(enrichedScript) // eval
         if (res.inherits("try-error")) {
-          throw new RserveException(conn, res.asString)
+          throw new RuntimeException(res.asString)
         }
         res.asNativeJavaObject
       }

@@ -33,7 +33,7 @@ class Client(val url: String) extends Actor {
     case r @ RStart => remoteMaster ! r
     case r: RRequest => remoteMaster ! r
     case RResponse(msg) => println(s"\nClient received result from R: $msg\n")
-    case RException(msg) => println(s"\nClient got exception:\n${msg}\n")
+    case RException(t) => println(s"\nClient got exception:\n${t.getMessage}\n")
     case StartAck => println("\nClient: R workers started\n")
     case StopAck => println("\nClient: R workers stopped\n")
   }
