@@ -212,5 +212,3 @@ case object RegisterRemoteActor extends Message
 case object RemoteActorRegistered extends Message
 
 case class PId(pid: Int) extends Message
-
-case object StopActorSystem extends Message
