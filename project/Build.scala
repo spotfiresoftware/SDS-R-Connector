@@ -77,13 +77,20 @@ object AlpineRConnectorBuild extends Build {
   
   lazy val messages = project.settings(sharedSettings ++ akkaSettings)
 
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.0.9"
+
   lazy val server = project
     .dependsOn(messages)
     .settings(sharedSettings ++ akkaSettings)
     .settings(artifact in (Compile, assembly) ~= { art =>
         art.copy(`classifier` = Some("assembly"))
      })
-    .settings(libraryDependencies += "org.mockito" % "mockito-all" % "1.9.5" % "test")
+    .settings(libraryDependencies ++= Seq(
+      "ch.qos.logback" % "logback-classic" % "1.0.9",
+      "org.mockito" % "mockito-all" % "1.9.5" % "test"
+     ))
+    .settings(resourceDirectory in Compile := baseDirectory.value / "src" / "main" / "resources")
+    .settings(jarName in assembly := "alpine-r-connector.jar")
    
   /* not camelCase, but named the same as directory since Scala's macro will pick it up;
      otherwise, you would have to write the Project() boilerplate

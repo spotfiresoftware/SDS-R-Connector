@@ -53,11 +53,6 @@ class RServeActorSupervisor extends Actor {
       Restart
     }
 
-    case e: ActorKilledException => {
-      log.info(s"R actor killed by supervisor. Restarting actor and R worker process...")
-      Restart
-    }
-
     case _ => Escalate
   }
 

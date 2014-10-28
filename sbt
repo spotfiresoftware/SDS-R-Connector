@@ -1,2 +1,2 @@
 #!/bin/bash
-java -jar sbt-launch.jar $@
+java -Xmx1024M -Xms128M -XX:MaxPermSize=512M -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -jar sbt-launch.jar $@
