@@ -57,6 +57,23 @@ object RServeMain {
 
   def main(args: Array[String]): Unit = {
 
+    // Check Java version - 1.6 is a minimum requirement
+    """(\d+\.\d+)\.?(\w+)?""".r.unapplySeq(System.getProperty("java.version")) match {
+      case None => {
+        sys.error("Java version not recognized")
+        sys.exit(1)
+      }
+      case Some(lst) => {
+        val ver = lst(0).toDouble
+        if (ver >= 1.6) {
+          println(s"Java version $ver is OK (>= 1.6)")
+        } else {
+          sys.error(s"Java version $ver is inadequate (should be >= 1.6)")
+          sys.exit(1)
+        }
+      }
+    }
+
     val port = config.getInt("akka.remote.netty.tcp.port")
 
     // Need to check if port is free due to pre-Akka 2.3 bug
