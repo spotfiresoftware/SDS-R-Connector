@@ -15,6 +15,8 @@
 
 package com.alpine.rconnector.server
 
+import java.io.File
+
 import akka.actor.{ Props, ActorSystem }
 import akka.event.Logging
 import com.typesafe.config.ConfigFactory
@@ -30,55 +32,25 @@ object RServeMain {
   // this has to be lazy since we first need to check if the port is free
   private lazy val system: ActorSystem = ActorSystem.create("rServeActorSystem", config)
 
+  val localTempDir = config.getString("akka.rserve.localTempDir")
+  val localPort = config.getInt("akka.remote.netty.tcp.port")
+
   def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
   def shutdown(): Unit = system.shutdown()
 
-  /**
-   * Old Akka versions will hang and not exit the program if the socket is already bound.
-   * Check if the socket is bound and if it is, do a System.exit(1).
-   * If the socket is free, close it and let Akka do its thing.
-   * @param port
-   */
-  private def isSocketFree(port: Int): Unit = {
-
-    Try(new ServerSocket(port)) match {
-      case Success(socket) => socket.close()
-      case Failure(e: BindException) => {
-        sys.error(s"Port $port is already bound")
-        sys.exit(1)
-      }
-      case Failure(e) => {
-        sys.error(e.getMessage)
-        e.printStackTrace()
-        sys.exit(1)
-      }
-    }
-  }
-
   def main(args: Array[String]): Unit = {
 
-    // Check Java version - 1.6 is a minimum requirement
-    """(\d+\.\d+)\.?(\w+)?""".r.unapplySeq(System.getProperty("java.version")) match {
-      case None => {
-        sys.error("Java version not recognized")
-        sys.exit(1)
-      }
-      case Some(lst) => {
-        val ver = lst(0).toDouble
-        if (ver >= 1.6) {
-          println(s"Java version $ver is OK (>= 1.6)")
-        } else {
-          sys.error(s"Java version $ver is inadequate (should be >= 1.6)")
-          sys.exit(1)
-        }
-      }
-    }
+    // Ensure the local temp dir exists and is readable and writeable
+    println(s"Checking if the local temp directory $localTempDir exists and is readable/writeable")
+    Utils.checkTempDirReadWrite(localTempDir)
 
-    val port = config.getInt("akka.remote.netty.tcp.port")
+    // Ensure that JRE is 1.6 or later
+    // This is hard-coded since we know the requirements are >= 1.6
+    Utils.ensureJavaVersion()
 
     // Need to check if port is free due to pre-Akka 2.3 bug
-    println(s"Checking if chosen port $port is free")
-    isSocketFree(port)
+    println(s"Checking if chosen port $localPort is free")
+    Utils.isSocketFree(localPort)
 
     // If port is free, start actor system
     println("Port is free - starting actor system")

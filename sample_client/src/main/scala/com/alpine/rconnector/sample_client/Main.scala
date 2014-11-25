@@ -25,7 +25,7 @@ object Main extends App {
   Thread.sleep(5000)
   client ! RStart
   Thread.sleep(5000)
-  client ! RRequest("uuid123", "x = mean(1:10)", Array("x"))
+  //client ! RRequest("uuid123", "x = mean(1:10)", Array("x"))
   Thread.sleep(5000)
 
   system.shutdown()

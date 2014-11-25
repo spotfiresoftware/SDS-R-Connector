@@ -195,11 +195,6 @@ class RServeMaster extends Actor {
             $sessionUuidsToTerminate
           """.stripMargin)
 
-      //      sessionUuidsToTerminate.flatMap { id => rWorkerSessionMap.get(id).map {ref =>
-      //        log.info(s"Sending message $id to finish R session")
-      //        ref ! FinishRSession(id)
-      //      }}
-
       // finish R sessions
       for { id <- sessionUuidsToTerminate; ref <- rWorkerSessionMap.get(id) } {
         log.info(s"Sending Kill message to actor $ref to finish R session and restart the actor.")
@@ -256,11 +251,12 @@ class RServeMaster extends Actor {
 
     }
 
-    case x @ RRequest(uuid, rScript, returnSet) => {
+    case x: RRequest => {
+      //RRequest(uuid, rScript, returnSet) => {
 
       log.info(s"\n\nRServeMaster: received RRequest request and routing it to RServe actor\n\n")
 
-      resolveActor(uuid, sender) match {
+      resolveActor(x.uuid, sender) match {
 
         case Some(ref) => ref.tell(x, sender)
         case None => {
@@ -270,14 +266,15 @@ class RServeMaster extends Actor {
       }
     }
 
-    case x @ RAssign(uuid, dataFrames) => {
+    case x: RAssign => {
 
       log.info(s"\n\nRServeMaster: received RAssign request and routing it to RServe actor\n\n")
 
-      resolveActor(uuid, sender) match {
+      resolveActor(x.uuid, sender) match {
 
         case Some(ref) => ref.tell(x, sender)
         case None => {
+
           log.info(s"\n\nRAssign: R actor is not available\n\n")
           sender ! RActorIsNotAvailable
         }
@@ -309,39 +306,6 @@ class RServeMaster extends Actor {
       rWorkerSessionMap.clear()
 
       sender ! StopAck
-    }
-
-    case x @ StartTx(sessionUuid, datasetUuid, columnNammes) => {
-
-      log.info(s"\n\nMaster: got StartTx request for session $sessionUuid for dataset $datasetUuid\n\n")
-      resolveActor(sessionUuid, sender) match {
-        case Some(ref) => ref.tell(x, sender)
-        case None => sender ! RActorIsNotAvailable
-      }
-    }
-
-    case x @ EndTx(sessionUuid, datasetUuid) => {
-      log.info(s"\n\nMaster: got EndTx request for session $sessionUuid for dataset $datasetUuid\n\n")
-      resolveActor(sessionUuid, sender) match {
-        case Some(ref) => ref.tell(x, sender)
-        case None => sender ! RActorIsNotAvailable
-      }
-    }
-
-    case x @ DelimitedPacket(sessionUuid, datasetUuid, packetUuid, payload, delimiter) => {
-      log.info(s"\n\nMaster: got CsvPacket for session $sessionUuid for dataset $datasetUuid\n\n")
-      resolveActor(sessionUuid, sender) match {
-        case Some(ref) => ref.tell(x, sender)
-        case None => sender ! RActorIsNotAvailable
-      }
-    }
-
-    case x @ MapPacket(sessionUuid, datasetUuid, packetUuid, payload) => {
-      log.info(s"\n\nMaster: got MapPacket for session $sessionUuid for dataset $datasetUuid\n\n")
-      resolveActor(sessionUuid, sender) match {
-        case Some(ref) => ref.tell(x, sender)
-        case None => sender ! RActorIsNotAvailable
-      }
     }
 
     /* Unbind an individual R session */

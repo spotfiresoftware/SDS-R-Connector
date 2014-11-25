@@ -12,7 +12,7 @@ object AlpineRConnectorBuild extends Build {
       ms filter { case (file, toPath) => !toPath.endsWith("application.conf") }
 
   lazy val sharedSettings = Defaults.defaultSettings ++ scalariformSettings ++ assemblySettings  ++ Seq(  
-    version := "0.4",
+    version := "0.6",
     organization := "com.alpine",
     scalaVersion := "2.10.3",
     fork := true,
@@ -25,7 +25,8 @@ object AlpineRConnectorBuild extends Build {
                       "Maven Central" at "http://repo1.maven.org",
                       "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
                       "Sonatype releases" at "https://oss.sonatype.org/content/repositories/releases/",
-                      "Spray Repo" at "http://repo.spray.io"),
+                      "Spray Repo" at "http://repo.spray.io",
+                      "spray nightlies repo" at "http://nightlies.spray.io"),
     libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.1.6" % "test",
     javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
@@ -54,16 +55,22 @@ object AlpineRConnectorBuild extends Build {
   	libraryDependencies ++= {
       val akkaVer = "2.2.3"
   	  Seq(
-  	    "org.spark-project.akka"    %%    "akka-actor"                    %    s"$akkaVer-shaded-protobuf",  // akkaVertion
-        "org.spark-project.akka"    %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
-        "org.spark-project.akka"    %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
-        "org.spark-project.akka"    %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test"
+  	    "org.spark-project.akka"     %%    "akka-actor"                    %    s"$akkaVer-shaded-protobuf",  // akkaVertion
+        "org.spark-project.akka"     %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
+        "org.spark-project.akka"     %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
+        "org.spark-project.akka"     %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test",
+        "org.apache.httpcomponents"  %     "httpclient"                    %    "4.3.5",
+        "com.jsuereth"               %%    "scala-arm"                     %    "1.4"
+       // "io.spray"                  %     "spray-client"                  %    s"1.2.2-20141105"
       //  "com.typesafe.akka"    %%    "akka-kernel"                   %    akkaVersion,
       //  "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion
       //  "com.typesafe.akka"    %%    "akka-persistence-experimental" %    akkaVersion
   	  )
     }
   )
+
+  // 1.2.2
+  // libraryDependencies += "io.spray" % "spray-can" % "1.0"
 
   lazy val root = project
     .in(file("."))
@@ -86,6 +93,7 @@ object AlpineRConnectorBuild extends Build {
         art.copy(`classifier` = Some("assembly"))
      })
     .settings(libraryDependencies ++= Seq(
+      "co.paralleluniverse" % "quasar-core" % "0.6.1",
       "ch.qos.logback" % "logback-classic" % "1.0.9",
       "org.mockito" % "mockito-all" % "1.9.5" % "test"
      ))

@@ -17,10 +17,7 @@
 
 package com.alpine.rconnector.messages
 
-import akka.actor.ActorRef
 import java.util.{ Map => JMap }
-
-import scala.beans.BeanProperty
 
 /**
  * Messages for communication between Alpine's backend and the R server.
@@ -31,19 +28,82 @@ import scala.beans.BeanProperty
  */
 sealed trait Message extends Serializable
 
-/**
- * Request from Scala/Java to R
- * @param rScript message - R code to execute
- * @param returnSet - set of elements to return after R execution
- * (a Java HashSet as opposed to a Scala one becasuse the object will be instantiated in Java)
- */
-case class RRequest(clientUUID: String, rScript: String, returnSet: Array[_]) extends Message
+sealed class RRequest(
+  val uuid: String,
+  val rScript: String,
+  val returnSet: Array[_],
+  val numPreviewRows: Long = 1000,
+  val consoleOutputVar: Option[String] = None,
+  val escapeStr: Option[String] = None,
+  val delimiterStr: Option[String] = None,
+  val quoteStr: Option[String] = None,
+  val httpUploadUrl: Option[String] = None,
+  val httpUploadHeader: Option[JMap[String, String]] = None) extends Message
 
-/**
- *
- * @param dataFrames
- */
-case class RAssign(uuid: String, dataFrames: JMap[String, Any]) extends Message
+object RRequest {
+
+  def unapply(req: RRequest) =
+    Some(req.uuid, req.rScript, req.returnSet, req.consoleOutputVar, req.escapeStr,
+      req.delimiterStr, req.quoteStr, req.httpUploadUrl, req.httpUploadHeader, req.numPreviewRows)
+}
+
+case class SyntaxCheckRequest(
+  override val uuid: String,
+  override val rScript: String,
+  override val returnSet: Array[_])
+    extends RRequest(uuid, rScript, returnSet)
+
+case class HadoopRRequest(
+  override val uuid: String,
+  override val rScript: String,
+  override val returnSet: Array[_],
+  override val numPreviewRows: Long = 1000,
+  override val consoleOutputVar: Some[String],
+  override val escapeStr: Option[String] = None,
+  override val delimiterStr: Option[String] = None,
+  override val quoteStr: Option[String] = None,
+  override val httpUploadUrl: Option[String] = None,
+  override val httpUploadHeader: Option[JMap[String, String]] = None)
+    extends RRequest(uuid, rScript, returnSet, numPreviewRows)
+
+case class DatabaseRRequest(
+  override val uuid: String,
+  override val rScript: String,
+  override val returnSet: Array[_],
+  override val numPreviewRows: Long = 1000,
+  override val consoleOutputVar: Some[String],
+  override val escapeStr: Some[String],
+  override val delimiterStr: Some[String],
+  override val quoteStr: Some[String],
+  override val httpUploadUrl: Option[String] = None,
+  override val httpUploadHeader: Option[JMap[String, String]] = None) extends RRequest(uuid, rScript, returnSet, numPreviewRows)
+
+case class RAssign(
+  val uuid: String,
+  val objects: JMap[String, Any],
+  val httpDownloadUrl: Option[String] = None,
+  val httpDownloadHeader: Option[JMap[String, String]] = None) extends Message
+
+//object RAssign {
+//
+//  def unapply(r: RAssign) =
+//    Some(r.uuid, r.objects, r.httpDownloadUrl, r.httpDownloadHeader)
+//}
+//
+//// uuid, objects, httpDownloadUrl, httpDownloadHeader, httpUploadUrl, httpUploadHeader
+//case class DatabaseAssign(
+//  override val uuid: String,
+//  override val objects: JMap[String, Any],
+//  override val httpDownloadUrl: Option[String] = None,
+//  override val httpDownloadHeader: Option[JMap[String, String]] = None) extends RAssign(uuid, objects)
+//
+//case class HadoopAssign(
+//  override val uuid: String,
+//  override val objects: JMap[String, Any],
+//  override val httpDownloadUrl: Option[String] = None,
+//  override val httpDownloadHeader: Option[JMap[String, String]] = None) extends RAssign(uuid, objects)
+
+//case class RAssign(uuid: String, objects: JMap[String, Any]) extends Message
 
 /**
  * Response from R to Scala/Java
@@ -137,78 +197,33 @@ case class FreeRWorkerCount(i: Int) extends Message
 
 /**
  *
- * @param sessionUuid
- * @param datasetUuid
  */
-case class StartTx(sessionUuid: String, datasetUuid: String, columnNames: Array[String]) extends Message
-
-/**
- *
- * @param sessionUuid
- * @param datasetUuid
- */
-case class StartTxAck(sessionUuid: String, datasetUuid: String) extends Message
-
-/**
- *
- * @param sessionUuid
- * @param datasetUuid
- */
-case class EndTx(sessionUuid: String, datasetUuid: String) extends Message
-
-/**
- *
- * @param datasetUuid
- */
-case class EndTxAck(sessionUuid: String, datasetUuid: String) extends Message
-
-/**
- *
- */
-sealed trait Packet extends Message
-
-/**
- *
- * @param sessionUuid
- * @param datasetUuid
- * @param packetSerialID
- * @param payload
- */
-case class DelimitedPacket(sessionUuid: String, datasetUuid: String, packetSerialID: Long,
-  payload: String, delimiter: String = ",") extends Packet
-
-/**
- *
- * @param sessionUuid
- * @param datasetUuid
- * @param packetSerialID
- */
-case class DelimitedPacketAck(sessionUuid: String, datasetUuid: String, packetSerialID: Long) extends Message
-
-/**
- *
- * @param sessionUuid
- * @param datasetUuid
- * @param packetSerialID
- * @param payload
- */
-case class MapPacket(sessionUuid: String, datasetUuid: String, packetSerialID: Long,
-  payload: Map[String, Any]) extends Message
-
 case object RemoteFrameSizeRequest extends Message
 
+/**
+ *
+ * @param sizeBytes
+ */
 case class RemoteFrameSizeResponse(sizeBytes: Long) extends Message
 
-case class ClientHeartbeatRequest(uuid: String) extends Message
-
-case class ServerHeartbeatReponse(uuid: String) extends Message
-
-case class ServerHeartbeatRequest(uuid: String) extends Message
-
-case class ClientHeartbeatResponse(uuid: String) extends Message
-
+/**
+ *
+ */
 case object RegisterRemoteActor extends Message
 
+/**
+ *
+ */
 case object RemoteActorRegistered extends Message
 
+/**
+ *
+ * @param pid
+ */
 case class PId(pid: Int) extends Message
+
+/**
+ *
+ * @param uuid
+ */
+case class SyntaxCheckOK(uuid: String)

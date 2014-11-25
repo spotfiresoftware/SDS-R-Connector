@@ -15,21 +15,29 @@
 
 package com.alpine.rconnector.server
 
+import java.io.{ FileInputStream, FileOutputStream, File }
+
+import org.apache.http.HttpVersion
+import org.apache.http.client.methods.{ HttpPost, HttpGet }
+import org.apache.http.entity.{ ContentType, FileEntity }
 import org.rosuda.REngine.Rserve.RConnection
 import akka.AkkaException
 import akka.actor.Actor
 import com.alpine.rconnector.messages._
 import akka.event.Logging
 import org.rosuda.REngine.REXP
-import org.rosuda.REngine.Rserve.RserveException
+import org.apache.http.impl.client.HttpClientBuilder
 import scala.collection.JavaConversions._
 import com.alpine.rconnector.messages.RException
 import com.alpine.rconnector.messages.RResponse
 import com.alpine.rconnector.messages.RRequest
 import com.alpine.rconnector.messages.FinishRSession
-import java.util.{ Map => JMap }
+import java.util.{ Map => JMap, UUID }
 import scala.collection.mutable.{ HashMap => MutableHashMap }
 import scala.sys.process._
+import resource._
+import org.apache.http.HttpStatus
+import scala.collection.mutable
 
 /**
  * This is the actor that establishes a connection to R via Rserve
@@ -45,6 +53,10 @@ class RServeActor extends Actor {
 
   protected[this] var conn: RConnection = _
   protected[this] var pid: Int = _
+  protected[this] var tempFilePath: String = _
+
+  val downloadExtension = "download"
+  val uploadExtension = "upload"
 
   def updateConnAndPid() = {
 
@@ -55,21 +67,16 @@ class RServeActor extends Actor {
 
   override def preStart(): Unit = updateConnAndPid()
 
-  // Map of datasetUuid -> sessionUuid
-  private[this] val txMap = MutableHashMap[String, String]()
-
   logActorStart(this)
 
   private def killRProcess(): Int = s"kill -9 $pid" !
 
   override def postStop(): Unit = killRProcess()
-  // conn.close()
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // send message about exception to the client (e.g. for UI reporting)
     sender ! RException(reason)
     killRProcess()
-    //conn.close()
     super.preRestart(reason, message)
   }
 
@@ -79,45 +86,37 @@ class RServeActor extends Actor {
   // remove all temporary data from R workspace
   protected[this] def clearWorkspace() = conn.eval("rm(list = ls())")
 
-  def receive: Receive = {
+  private def eval(s: String): java.lang.Object = {
+    val enrichedScript =
 
-    case RRequest(clientUUID, rScript, returnSet: Array[String]) => {
-
-      def eval(s: String): java.lang.Object = {
-        val enrichedScript =
-
-          s"""try({
+      s"""try({
                          $s
                        },
                        silent=TRUE)""".stripMargin
-        //  log.info(s"\n\enrichedScript:\n\n$enrichedScript\n\n")
-        log.info(s"\n\nEvaluating $enrichedScript\n\n")
-        val res: REXP = conn.parseAndEval(enrichedScript) // eval
-        if (res.inherits("try-error")) {
-          throw new RuntimeException(res.asString)
-        }
-        res.asNativeJavaObject
+    log.info(s"\n\nEvaluating $enrichedScript\n\n")
+    val res: REXP = conn.parseAndEval(enrichedScript) // eval
+    if (res.inherits("try-error")) {
+      throw new RuntimeException(res.asString)
+    }
+    res.asNativeJavaObject
+  }
+
+  def receive: Receive = {
+
+    case RAssign(uuid, objects, httpDownloadUrl, httpDownloadHeader) => {
+
+      // TODO: distinguish between Hadoop and database REST downloads
+      // TODO: (DatabaseAssign and HadoopAssign subtype HadoopAssign)
+
+      if (httpDownloadUrl != None && httpDownloadHeader != None) {
+
+        restDownload(httpDownloadUrl, httpDownloadHeader, uuid)
       }
 
-      // evaluate R script
-      eval(rScript)
+      objects.foreach { elem =>
 
-      val results = returnSet.map(elem => (elem, eval(elem))).toMap
-
-      log.info(s"\n\nRESULTS: $results")
-      log.info(s"\n\n${results.getClass.getName}: ${results.toString}\n\n")
-
-      sender ! RResponse(results)
-
-      log.info(s"In RServeActor: done with R request, sent response")
-
-    }
-
-    case RAssign(clientUUID: String, dataFrames: JMap[_, _]) => {
-
-      // asInstanceOf[JMap[String, String]].foreach { elem => conn.assign(elem._1, elem._2) }
-      dataFrames.foreach { elem =>
         elem match {
+
           case (x, y: String) => conn.assign(x, y)
           case (x, y: Array[Byte]) => conn.assign(x, y)
           case (x, y) => throw new IllegalStateException(
@@ -125,26 +124,56 @@ class RServeActor extends Actor {
           )
         }
       }
-      log.info(s"""\n\nAssigned the following variables to the R workspace for session $clientUUID:\n
-                   ${dataFrames.keySet} """)
-      sender ! AssignAck(clientUUID, dataFrames.keySet.map(_.toString).toArray)
+
+      sender ! AssignAck(uuid, objects.keySet.map(_.toString).toArray)
     }
 
-    case StartTx(sessionUuid, datasetUuid, columnNames) => {
-      txMap += datasetUuid -> sessionUuid
-      // open file connection
-      sender ! StartTxAck(sessionUuid, datasetUuid)
+    case SyntaxCheckRequest(uuid, rScript, returnSet) => {
+
+      eval(rScript)
+      // We won't get here if an exception occurred
+      sender ! SyntaxCheckOK(uuid)
     }
 
-    case EndTx(sessionUuid, datasetUuid) => {
-      txMap -= datasetUuid
-      // close file connection and mark the data as being OK to be read from R
-      // (note the path to enrich the R script)
-      sender ! EndTx(sessionUuid, datasetUuid)
+    case HadoopRRequest(uuid, rScript, returnSet, numPreviewRows, consoleOutputVar, escapeStr,
+      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+
+      ) => {
+
+      eval(enrichRScript(rScript, consoleOutputVar.get, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr.get, numPreviewRows))
+
+      // TODO: 2) upload data via REST
+      restUpload(rScript, httpUploadUrl.get, httpUploadHeader.get, uuid)
+
+      // TODO: 3) delete temp file
+      deleteTempFiles(rScript, uuid)
+
+      // TODO: 3) send RResponse
+
+      //      returnSet.map(elem => )
+      //
+      //      sender ! RResponse()
+
+      // RResponse(map: Map[String, Any])
+
     }
 
-    case DelimitedPacket(sessionUuid, datasetUuid, packetUuid, payload, delimiter) => {
-      // write packet to disk
+    case DatabaseRRequest(uuid, rScript, returnSet, numPreviewRows, consoleOutputVar, escapeStr,
+      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader) => {
+
+      // TODO: 1) eval enriched script
+      eval(enrichRScript(rScript, consoleOutputVar.get, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr.get, numPreviewRows))
+
+      // TODO: 2) upload data via REST
+
+      // TODO: This is not done since we need to check if we're uploading or not
+      restUpload(rScript, httpUploadUrl.get, httpUploadHeader.get, uuid)
+
+      // TODO: 3) delete temp files
+      deleteTempFiles(rScript, uuid)
+
+      // TODO: 3) send RResponse
+
     }
 
     case FinishRSession(uuid) => {
@@ -155,13 +184,140 @@ class RServeActor extends Actor {
       sender ! RSessionFinishedAck(uuid)
     }
 
-    case ClientHeartbeatRequest(uuid) => {
-      log.info(s"\nSending heartbeat response to $uuid\n")
-      sender ! ServerHeartbeatReponse(uuid)
-    }
-
     case other => throw new AkkaException(s"Unexpected message of type ${other.getClass.getName} from $sender")
 
   }
+
+  // client will pass in the header info, depending on whether it's DB or Hadoop
+  // mutable map is necessary due to implicit conversion from java.util.Map
+  private def restDownload(url: Option[String], header: Option[JMap[String, String]], uuid: String): Unit = {
+
+    if (url != None && header != None) {
+
+      val localPath = downloadLocalPath(uuid)
+
+      log.info(
+        s"""Starting download from $url
+        with header $header
+        into local file $localPath
+        """.stripMargin)
+
+      // try-with-resources (thanks to Josh Suereth's scala-arm library)
+      for {
+
+        client <- managed(HttpClientBuilder.create().build())
+        fos <- managed(new FileOutputStream(new File(localPath)))
+
+      } {
+
+        val get = new HttpGet(url.get) {
+
+          setProtocolVersion(HttpVersion.HTTP_1_1) // ensure chunking
+          header.get.foreach { case (k, v) => setHeader(k, v) }
+        }
+
+        val response = client.execute(get)
+        response.getEntity.writeTo(fos)
+
+        val statusLine = response.getStatusLine
+        val statusCode = statusLine.getStatusCode
+        get.releaseConnection()
+
+        if (statusCode != HttpStatus.SC_OK) {
+
+          throw new RuntimeException(s"REST download of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}")
+        }
+
+        log.info(s"File $localPath downloaded successfully")
+      }
+
+    }
+
+  }
+
+  // mutable map is necessary due to implicit conversion from java.util.Map
+  private def restUpload(rScript: String, url: String, header: mutable.Map[String, String], uuid: String): Unit = {
+
+    if (hasOutput(rScript)) {
+
+      // TODO: change localPath to config param?
+      val localPath = uploadLocalPath(uuid)
+
+      for { client <- managed(HttpClientBuilder.create().build()) } {
+
+        val post = new HttpPost(url) {
+
+          setProtocolVersion(HttpVersion.HTTP_1_1) // ensure chunking
+          setEntity(new FileEntity(new File(localPath), ContentType.MULTIPART_FORM_DATA))
+          header.foreach { case (k, v) => setHeader(k, v) }
+        }
+
+        val response = client.execute(post)
+        val statusLine = response.getStatusLine
+        val statusCode = statusLine.getStatusCode
+        post.releaseConnection()
+
+        if (statusCode != HttpStatus.SC_OK) {
+
+          throw new RuntimeException(s"REST upload from R server to Alpine failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}")
+
+        }
+
+        log.info(s"File $localPath uploaded successfully")
+      }
+
+    }
+  }
+
+  private def deleteTempFile(localPath: String): Unit = new File(localPath).delete()
+
+  private def deleteDownloadTempFile(rScript: String, uuid: String): Unit =
+    if (hasInput(rScript)) deleteTempFile(downloadLocalPath(uuid))
+
+  private def deleteUploadTempFile(rScript: String, uuid: String): Unit =
+    if (hasOutput(rScript)) deleteTempFile(uploadLocalPath(uuid))
+
+  private def deleteTempFiles(rScript: String, uuid: String): Unit = {
+
+    deleteDownloadTempFile(rScript, uuid)
+    deleteUploadTempFile(rScript, uuid)
+  }
+
+  private def enrichRScript(rawScript: String,
+    consoleOutputVar: String,
+    inputPath: String,
+    outputPath: String,
+    delimiterStr: String,
+    previewNumRows: Long): String = {
+
+    s"""
+            $consoleOutputVar <- capture.output({
+
+            library(data.table);
+
+            ${if (hasInput(rawScript)) s"alpine_input <- fread(input=$inputPath, sep=$delimiterStr);" else ""}
+
+            $rawScript
+
+            ${
+      if (hasOutput(rawScript))
+        s"""# write temp table to disk
+                  write.table(x = alpine_output, file='$outputPath', sep=$delimiterStr, append=FALSE, quote=TRUE, row.names=FALSE)
+                  # preview this many rows in UI
+                  alpine_output <- alpine_output[1:$previewNumRows, ]
+                  """
+      else ""
+    }
+            });
+        """.stripMargin
+  }
+
+  private def downloadLocalPath(uuid: String) = s"${RServeMain.localTempDir}/$uuid.$downloadExtension"
+
+  private def uploadLocalPath(uuid: String) = s"${RServeMain.localTempDir}/$uuid.$uploadExtension"
+
+  private def hasInput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_input", "#")
+
+  private def hasOutput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_output", "#")
 
 }

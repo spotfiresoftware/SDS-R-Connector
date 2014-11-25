@@ -16,7 +16,10 @@
 package com.alpine.rconnector.server
 
 import akka.actor.{ ActorKilledException, Props, Actor, Kill, OneForOneStrategy }
+import co.paralleluniverse.fibers.Fiber
+import co.paralleluniverse.strands.Strand
 import com.alpine.rconnector.messages.{ FinishRSession, RException }
+import com.jezhumble.javasysmon.{JavaSysMon, OsProcess}
 import org.rosuda.REngine.Rserve.RserveException
 import org.rosuda.REngine.{ REXPMismatchException, REngineEvalException, REngineException }
 import akka.actor.SupervisorStrategy.{ Escalate, Restart }
@@ -58,12 +61,14 @@ class RServeActorSupervisor extends Actor {
 
   def receive = {
 
-    case PId(pid) => this.pid = pid
+    case PId(pid) => {
+      this.pid = pid
+      // TODO: enable memory monitoring (see the MemUsage example below)
+    }
 
     case FinishRSession(uuid) => {
       killRProcess()
       rServe ! Kill
-
     }
 
     /* This is just the RException sent due to the actor being killed by the supervisor.
@@ -78,11 +83,42 @@ class RServeActorSupervisor extends Actor {
 
     if (System.getProperty("os.name").toLowerCase().contains("windows")) {
 
+      // TODO: this could be managed by new JavaSysMon().kilProcess(pid) instead
       s"taskkill /PID $pid /F" !
 
     } else {
 
+      // TODO: this could be managed by new JavaSysMon().kilProcess(pid) instead
       s"kill -9 $pid" !
+    }
+  }
+
+  // TODO: This isn't yet hooked up to anything
+  // TODO: Base maxMem on R server settings
+  // http://jezhumble.github.io/javasysmon/
+  private class MemUsage(maxMem: Long) {
+    var state = true
+    val fiber: Strand = new Fiber() {
+      override protected def run(): Unit = {
+        val monitor = new JavaSysMon()
+        val process = new OsProcess().find(pid)
+        while (state) {
+          val info = process.processInfo
+          val resident = info.getResidentBytes
+          if (resident >= maxMem) {
+            // TODO: send a message to the client that R exceeded the allowed memory
+            // TODO: kill the R process and the worker actor via FinishRSession(uuid)
+            monitor.killProcess(pid)
+            // or
+            // killRProcess()
+            rServe ! Kill
+          }
+          Thread.sleep(100L)
+        }
+
+      }
+      // TODO: need to call cancel, or else this fiber will keep running forever, causing a leak
+      def cancel(): Unit = state = false
     }
   }
 
