@@ -74,7 +74,7 @@ object AlpineRConnectorBuild extends Build {
 
   lazy val root = project
     .in(file("."))
-    .aggregate(messages, server, sample_client)
+    .aggregate(messages, server)
     .settings(sharedSettings)
     .settings(
       artifact in (Compile, assembly) ~= { art =>
@@ -99,17 +99,5 @@ object AlpineRConnectorBuild extends Build {
      ))
     .settings(resourceDirectory in Compile := baseDirectory.value / "src" / "main" / "resources")
     .settings(jarName in assembly := "alpine-r-connector.jar")
-   
-  /* not camelCase, but named the same as directory since Scala's macro will pick it up;
-     otherwise, you would have to write the Project() boilerplate
-   */
-  lazy val sample_client = project
-    .settings(sharedSettings ++ akkaSettings)
-    .dependsOn(messages, server)
-    .settings(
-      libraryDependencies ++= Seq(
-      	"org.mockito" % "mockito-all" % "1.9.5",
-        "org.scalatest" % "scalatest_2.10" % "2.1.6" % "test"
-      )
-    )
+  
 }

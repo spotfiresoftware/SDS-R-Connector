@@ -32,7 +32,7 @@ object RServeMain {
   // this has to be lazy since we first need to check if the port is free
   private lazy val system: ActorSystem = ActorSystem.create("rServeActorSystem", config)
 
-  val localTempDir = config.getString("akka.rserve.localTempDir")
+  val localTempDir = config.getString("akka.rServe.localTempDir")
   val localPort = config.getInt("akka.remote.netty.tcp.port")
 
   def startup(): Unit = system.actorOf(Props[RServeMaster], "master")

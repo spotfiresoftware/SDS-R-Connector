@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.alpine.rconnector.messages
+package com.alpine.rconnector.messagescom.alpine.rconnector.messages
 
 import java.util.{ Map => JMap }
 
@@ -28,12 +28,30 @@ import java.util.{ Map => JMap }
  */
 sealed trait Message extends Serializable
 
+/**
+ *
+ * @param rConsoleOutput
+ * @param outputDataFrame
+ */
+case class ReturnNames(rConsoleOutput: String, outputDataFrame: String = "alpine_output")
+
+/**
+ *
+ * @param uuid
+ * @param rScript
+ * @param returnNames
+ * @param numPreviewRows
+ * @param escapeStr
+ * @param delimiterStr
+ * @param quoteStr
+ * @param httpUploadUrl
+ * @param httpUploadHeader
+ */
 sealed class RRequest(
   val uuid: String,
   val rScript: String,
-  val returnSet: Array[_],
+  val returnNames: Option[ReturnNames] = None,
   val numPreviewRows: Long = 1000,
-  val consoleOutputVar: Option[String] = None,
   val escapeStr: Option[String] = None,
   val delimiterStr: Option[String] = None,
   val quoteStr: Option[String] = None,
@@ -42,74 +60,69 @@ sealed class RRequest(
 
 object RRequest {
 
+  /**
+   *
+   * @param req
+   * @return
+   */
   def unapply(req: RRequest) =
-    Some(req.uuid, req.rScript, req.returnSet, req.consoleOutputVar, req.escapeStr,
-      req.delimiterStr, req.quoteStr, req.httpUploadUrl, req.httpUploadHeader, req.numPreviewRows)
+    Some(req.uuid, req.rScript, req.returnNames, req.numPreviewRows, req.escapeStr,
+      req.delimiterStr, req.quoteStr, req.httpUploadUrl, req.httpUploadHeader)
 }
 
+/**
+ *
+ * @param uuid
+ * @param rScript
+ */
 case class SyntaxCheckRequest(
   override val uuid: String,
-  override val rScript: String,
-  override val returnSet: Array[_])
-    extends RRequest(uuid, rScript, returnSet)
+  override val rScript: String)
+    extends RRequest(uuid, rScript)
 
-case class HadoopRRequest(
+/**
+ *
+ * @param uuid
+ * @param rScript
+ * @param returnNames
+ * @param numPreviewRows
+ * @param escapeStr
+ * @param delimiterStr
+ * @param quoteStr
+ * @param httpUploadUrl
+ * @param httpUploadHeader
+ */
+case class ExecuteRRequest(
   override val uuid: String,
   override val rScript: String,
-  override val returnSet: Array[_],
+  override val returnNames: Some[ReturnNames],
   override val numPreviewRows: Long = 1000,
-  override val consoleOutputVar: Some[String],
   override val escapeStr: Option[String] = None,
   override val delimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
   override val httpUploadHeader: Option[JMap[String, String]] = None)
-    extends RRequest(uuid, rScript, returnSet, numPreviewRows)
+    extends RRequest(uuid, rScript, returnNames, numPreviewRows)
 
-case class DatabaseRRequest(
-  override val uuid: String,
-  override val rScript: String,
-  override val returnSet: Array[_],
-  override val numPreviewRows: Long = 1000,
-  override val consoleOutputVar: Some[String],
-  override val escapeStr: Some[String],
-  override val delimiterStr: Some[String],
-  override val quoteStr: Some[String],
-  override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[JMap[String, String]] = None) extends RRequest(uuid, rScript, returnSet, numPreviewRows)
-
+/**
+ *
+ * @param uuid
+ * @param objects
+ * @param httpDownloadUrl
+ * @param httpDownloadHeader
+ */
 case class RAssign(
   val uuid: String,
   val objects: JMap[String, Any],
   val httpDownloadUrl: Option[String] = None,
   val httpDownloadHeader: Option[JMap[String, String]] = None) extends Message
 
-//object RAssign {
-//
-//  def unapply(r: RAssign) =
-//    Some(r.uuid, r.objects, r.httpDownloadUrl, r.httpDownloadHeader)
-//}
-//
-//// uuid, objects, httpDownloadUrl, httpDownloadHeader, httpUploadUrl, httpUploadHeader
-//case class DatabaseAssign(
-//  override val uuid: String,
-//  override val objects: JMap[String, Any],
-//  override val httpDownloadUrl: Option[String] = None,
-//  override val httpDownloadHeader: Option[JMap[String, String]] = None) extends RAssign(uuid, objects)
-//
-//case class HadoopAssign(
-//  override val uuid: String,
-//  override val objects: JMap[String, Any],
-//  override val httpDownloadUrl: Option[String] = None,
-//  override val httpDownloadHeader: Option[JMap[String, String]] = None) extends RAssign(uuid, objects)
-
-//case class RAssign(uuid: String, objects: JMap[String, Any]) extends Message
-
 /**
- * Response from R to Scala/Java
- * @param map - map of results coming back from R to Scala/Java
+ *
+ * @param consoleOutput
+ * @param previewDataFrame
  */
-case class RResponse(map: Map[String, Any]) extends Message
+case class RResponse(consoleOutput: String, previewDataFrame: JMap[String, Object]) extends Message
 
 /**
  *

@@ -18,8 +18,8 @@ package com.alpine.rconnector.server
 import akka.actor.{ ActorKilledException, Props, Actor, Kill, OneForOneStrategy }
 import co.paralleluniverse.fibers.Fiber
 import co.paralleluniverse.strands.Strand
-import com.alpine.rconnector.messages.{ FinishRSession, RException }
-import com.jezhumble.javasysmon.{JavaSysMon, OsProcess}
+import com.alpine.rconnector.messages._
+import com.jezhumble.javasysmon.{ JavaSysMon, OsProcess }
 import org.rosuda.REngine.Rserve.RserveException
 import org.rosuda.REngine.{ REXPMismatchException, REngineEvalException, REngineException }
 import akka.actor.SupervisorStrategy.{ Escalate, Restart }
@@ -27,7 +27,6 @@ import scala.concurrent.duration._
 import akka.event.Logging
 import akka.actor.ActorKilledException
 import scala.sys.process._
-import com.alpine.rconnector.messages.PId
 
 /**
  * This actor supervises individual RServeActors. Without supervision, each RServeActor
@@ -62,17 +61,20 @@ class RServeActorSupervisor extends Actor {
   def receive = {
 
     case PId(pid) => {
+      log.info(s"Supervisor: received PId($pid)")
       this.pid = pid
       // TODO: enable memory monitoring (see the MemUsage example below)
     }
 
     case FinishRSession(uuid) => {
+      log.info(s"Received request to finish R session. Killing R process")
       killRProcess()
+      log.info(s"Killing child and restarting")
       rServe ! Kill
     }
 
     /* This is just the RException sent due to the actor being killed by the supervisor.
-       We can ignore it. */
+       We can ignore it. We can add some extra logic here later*/
     case RException(t) => {
     }
 
@@ -96,30 +98,31 @@ class RServeActorSupervisor extends Actor {
   // TODO: This isn't yet hooked up to anything
   // TODO: Base maxMem on R server settings
   // http://jezhumble.github.io/javasysmon/
-  private class MemUsage(maxMem: Long) {
-    var state = true
-    val fiber: Strand = new Fiber() {
-      override protected def run(): Unit = {
-        val monitor = new JavaSysMon()
-        val process = new OsProcess().find(pid)
-        while (state) {
-          val info = process.processInfo
-          val resident = info.getResidentBytes
-          if (resident >= maxMem) {
-            // TODO: send a message to the client that R exceeded the allowed memory
-            // TODO: kill the R process and the worker actor via FinishRSession(uuid)
-            monitor.killProcess(pid)
-            // or
-            // killRProcess()
-            rServe ! Kill
-          }
-          Thread.sleep(100L)
-        }
-
-      }
-      // TODO: need to call cancel, or else this fiber will keep running forever, causing a leak
-      def cancel(): Unit = state = false
-    }
-  }
+  //  private class MemUsage(maxMem: Long) {
+  //    var state = true
+  //    val fiber: Strand = new Fiber() {
+  //      override protected def run() = {
+  //        val monitor = new JavaSysMon()
+  //        val process = monitor.processTree().find(pid)
+  //        while (state) {
+  //          val info = process.processInfo
+  //          val resident = info.getResidentBytes
+  //          if (resident >= maxMem) {
+  //            // TODO: send a message to the client that R exceeded the allowed memory
+  //            // TODO: kill the R process and the worker actor via FinishRSession(uuid)
+  //            monitor.killProcess(pid)
+  //            // or
+  //            // killRProcess()
+  //            rServe ! Kill
+  //          }
+  //          Thread.sleep(100L)
+  //        }
+  //
+  //        ???
+  //      }
+  //      // TODO: need to call cancel, or else this fiber will keep running forever, causing a leak
+  //      def cancel(): Unit = state = false
+  //    }
+  //  }
 
 }

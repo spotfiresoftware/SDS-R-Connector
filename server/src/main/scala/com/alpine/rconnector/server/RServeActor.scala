@@ -28,10 +28,7 @@ import akka.event.Logging
 import org.rosuda.REngine.REXP
 import org.apache.http.impl.client.HttpClientBuilder
 import scala.collection.JavaConversions._
-import com.alpine.rconnector.messages.RException
-import com.alpine.rconnector.messages.RResponse
-import com.alpine.rconnector.messages.RRequest
-import com.alpine.rconnector.messages.FinishRSession
+import com.alpine.rconnector.messages._
 import java.util.{ Map => JMap, UUID }
 import scala.collection.mutable.{ HashMap => MutableHashMap }
 import scala.sys.process._
@@ -62,6 +59,7 @@ class RServeActor extends Actor {
 
     conn = new RConnection()
     pid = conn.eval("Sys.getpid()").asNativeJavaObject.asInstanceOf[Array[Int]](0)
+    log.info(s"New R PID is $pid")
     context.parent ! PId(pid)
   }
 
@@ -69,19 +67,26 @@ class RServeActor extends Actor {
 
   logActorStart(this)
 
-  private def killRProcess(): Int = s"kill -9 $pid" !
+  private def killRProcess(): Int = {
+    log.info(s"Killing R process")
+    s"kill -9 $pid" !
+  }
 
   override def postStop(): Unit = killRProcess()
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // send message about exception to the client (e.g. for UI reporting)
+    log.info("preRestart")
     sender ! RException(reason)
     killRProcess()
     super.preRestart(reason, message)
   }
 
   // that's the default anyway, but you can do something different
-  override def postRestart(reason: Throwable): Unit = preStart()
+  override def postRestart(reason: Throwable): Unit = {
+    log.info("postRestart")
+    preStart()
+  }
 
   // remove all temporary data from R workspace
   protected[this] def clearWorkspace() = conn.eval("rm(list = ls())")
@@ -93,9 +98,10 @@ class RServeActor extends Actor {
                          $s
                        },
                        silent=TRUE)""".stripMargin
-    log.info(s"\n\nEvaluating $enrichedScript\n\n")
+    log.info(s"\nEvaluating $enrichedScript\n")
     val res: REXP = conn.parseAndEval(enrichedScript) // eval
     if (res.inherits("try-error")) {
+      log.info(s"Error in script:\n$s")
       throw new RuntimeException(res.asString)
     }
     res.asNativeJavaObject
@@ -105,14 +111,13 @@ class RServeActor extends Actor {
 
     case RAssign(uuid, objects, httpDownloadUrl, httpDownloadHeader) => {
 
-      // TODO: distinguish between Hadoop and database REST downloads
-      // TODO: (DatabaseAssign and HadoopAssign subtype HadoopAssign)
-
       if (httpDownloadUrl != None && httpDownloadHeader != None) {
 
+        log.info("Download URL and header are present - performing REST download")
         restDownload(httpDownloadUrl, httpDownloadHeader, uuid)
       }
 
+      log.info("Assigning objects (if any) to R workspace")
       objects.foreach { elem =>
 
         elem match {
@@ -125,54 +130,43 @@ class RServeActor extends Actor {
         }
       }
 
+      log.info("Acking assignment to client")
       sender ! AssignAck(uuid, objects.keySet.map(_.toString).toArray)
     }
 
-    case SyntaxCheckRequest(uuid, rScript, returnSet) => {
+    case SyntaxCheckRequest(uuid, rScript) => {
 
+      log.info("Evaluating syntax check request")
       eval(rScript)
+
       // We won't get here if an exception occurred
       sender ! SyntaxCheckOK(uuid)
     }
 
-    case HadoopRRequest(uuid, rScript, returnSet, numPreviewRows, consoleOutputVar, escapeStr,
-      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+    case ExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, escapeStr,
+      Some(delimiterStr), quoteStr, httpUploadUrl, httpUploadHeader
 
       ) => {
 
-      eval(enrichRScript(rScript, consoleOutputVar.get, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr.get, numPreviewRows))
+      log.info("Received ExecuteRRequest. Evaluating enriched script")
+      // execute R script
+      eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr, numPreviewRows))
 
-      // TODO: 2) upload data via REST
-      restUpload(rScript, httpUploadUrl.get, httpUploadHeader.get, uuid)
+      val rConsoleOutput = eval(returnNames.rConsoleOutput)
+      val dataPreview = eval(returnNames.outputDataFrame)
 
-      // TODO: 3) delete temp file
+      if (httpUploadUrl != None && httpUploadHeader != None) {
+
+        log.info(s"Upload URL and header are present - performing REST upload")
+
+        restUpload(rScript, httpUploadUrl.get, httpUploadHeader.get, uuid)
+      }
+
+      log.info(s"Deleting temp files")
       deleteTempFiles(rScript, uuid)
 
-      // TODO: 3) send RResponse
-
-      //      returnSet.map(elem => )
-      //
-      //      sender ! RResponse()
-
-      // RResponse(map: Map[String, Any])
-
-    }
-
-    case DatabaseRRequest(uuid, rScript, returnSet, numPreviewRows, consoleOutputVar, escapeStr,
-      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader) => {
-
-      // TODO: 1) eval enriched script
-      eval(enrichRScript(rScript, consoleOutputVar.get, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr.get, numPreviewRows))
-
-      // TODO: 2) upload data via REST
-
-      // TODO: This is not done since we need to check if we're uploading or not
-      restUpload(rScript, httpUploadUrl.get, httpUploadHeader.get, uuid)
-
-      // TODO: 3) delete temp files
-      deleteTempFiles(rScript, uuid)
-
-      // TODO: 3) send RResponse
+      log.info(s"Sending R response to client")
+      sender ! RResponse(rConsoleOutput.asInstanceOf[String], dataPreview)
 
     }
 
@@ -181,10 +175,16 @@ class RServeActor extends Actor {
       log.info(s"Finishing R session for UUID $uuid")
       killRProcess()
       updateConnAndPid()
+      log.info(s"Sending RSessionFinishedAck")
       sender ! RSessionFinishedAck(uuid)
     }
 
-    case other => throw new AkkaException(s"Unexpected message of type ${other.getClass.getName} from $sender")
+    case other => {
+
+      val errMsg = s"Unexpected message of type ${other.getClass.getName} from $sender"
+      log.error(errMsg)
+      throw new AkkaException(errMsg)
+    }
 
   }
 
@@ -238,10 +238,13 @@ class RServeActor extends Actor {
   // mutable map is necessary due to implicit conversion from java.util.Map
   private def restUpload(rScript: String, url: String, header: mutable.Map[String, String], uuid: String): Unit = {
 
+    log.info("In restUpload")
     if (hasOutput(rScript)) {
 
       // TODO: change localPath to config param?
       val localPath = uploadLocalPath(uuid)
+
+      log.info(s"Local upload path: $localPath")
 
       for { client <- managed(HttpClientBuilder.create().build()) } {
 
@@ -290,7 +293,7 @@ class RServeActor extends Actor {
     delimiterStr: String,
     previewNumRows: Long): String = {
 
-    s"""
+    val enrichedScript = s"""
             $consoleOutputVar <- capture.output({
 
             library(data.table);
@@ -310,6 +313,9 @@ class RServeActor extends Actor {
     }
             });
         """.stripMargin
+
+    log.info(s"Enriched script:\n$enrichedScript")
+    enrichedScript
   }
 
   private def downloadLocalPath(uuid: String) = s"${RServeMain.localTempDir}/$uuid.$downloadExtension"
