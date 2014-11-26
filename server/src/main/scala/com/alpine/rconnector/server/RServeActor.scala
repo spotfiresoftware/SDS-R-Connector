@@ -166,7 +166,7 @@ class RServeActor extends Actor {
       deleteTempFiles(rScript, uuid)
 
       log.info(s"Sending R response to client")
-      sender ! RResponse(rConsoleOutput.asInstanceOf[String], dataPreview)
+      sender ! RResponse(rConsoleOutput.asInstanceOf[String], dataPreview.asInstanceOf[Map[String, Object]])
 
     }
 

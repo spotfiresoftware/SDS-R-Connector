@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.alpine.rconnector.messagescom.alpine.rconnector.messages
+package com.alpine.rconnector.messages
 
 import java.util.{ Map => JMap }
 
@@ -122,7 +122,7 @@ case class RAssign(
  * @param consoleOutput
  * @param previewDataFrame
  */
-case class RResponse(consoleOutput: String, previewDataFrame: JMap[String, Object]) extends Message
+case class RResponse(consoleOutput: String, previewDataFrame: Map[String, Object]) extends Message
 
 /**
  *
