@@ -17,6 +17,7 @@
 
 package com.alpine.rconnector.messages
 
+import scala.collection.mutable.Map
 import java.util.{ Map => JMap }
 
 /**
@@ -33,7 +34,7 @@ sealed trait Message extends Serializable
  * @param rConsoleOutput
  * @param outputDataFrame
  */
-case class ReturnNames(rConsoleOutput: String, outputDataFrame: String = "alpine_output")
+case class ReturnNames(rConsoleOutput: String, outputDataFrame: Option[String] = Some("alpine_output"))
 
 /**
  *
@@ -56,7 +57,7 @@ sealed class RRequest(
   val delimiterStr: Option[String] = None,
   val quoteStr: Option[String] = None,
   val httpUploadUrl: Option[String] = None,
-  val httpUploadHeader: Option[JMap[String, String]] = None) extends Message
+  val httpUploadHeader: Option[Map[String, String]] = None) extends Message
 
 object RRequest {
 
@@ -101,7 +102,7 @@ case class ExecuteRRequest(
   override val delimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[JMap[String, String]] = None)
+  override val httpUploadHeader: Option[Map[String, String]] = None)
     extends RRequest(uuid, rScript, returnNames, numPreviewRows)
 
 /**
@@ -113,16 +114,16 @@ case class ExecuteRRequest(
  */
 case class RAssign(
   val uuid: String,
-  val objects: JMap[String, Any],
+  val objects: Map[String, Any],
   val httpDownloadUrl: Option[String] = None,
-  val httpDownloadHeader: Option[JMap[String, String]] = None) extends Message
+  val httpDownloadHeader: Option[Map[String, String]] = None) extends Message
 
 /**
  *
  * @param consoleOutput
  * @param previewDataFrame
  */
-case class RResponse(consoleOutput: String, previewDataFrame: Map[String, Object]) extends Message
+case class RResponse(consoleOutput: Array[String], previewDataFrame: Option[JMap[String, Object]]) extends Message
 
 /**
  *
@@ -239,4 +240,10 @@ case class PId(pid: Int) extends Message
  *
  * @param uuid
  */
-case class SyntaxCheckOK(uuid: String)
+case class SyntaxCheckOK(uuid: String) extends Message
+
+/**
+ *
+ * @param uuid
+ */
+case class StopActor(uuid: String) extends Message

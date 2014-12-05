@@ -54,13 +54,17 @@ object AlpineRConnectorBuild extends Build {
   lazy val akkaSettings = Seq(
   	libraryDependencies ++= {
       val akkaVer = "2.2.3"
+      val apacheHttpVer = "4.3.3"
   	  Seq(
   	    "org.spark-project.akka"     %%    "akka-actor"                    %    s"$akkaVer-shaded-protobuf",  // akkaVertion
         "org.spark-project.akka"     %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
         "org.spark-project.akka"     %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
         "org.spark-project.akka"     %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test",
-        "org.apache.httpcomponents"  %     "httpclient"                    %    "4.3.5",
+        "org.apache.httpcomponents"  %     "httpclient"                    %    s"$apacheHttpVer",   
+        "org.apache.httpcomponents"  %     "httpcore"                      %    s"$apacheHttpVer",   
+        "org.apache.httpcomponents"  %     "httpmime"                      %    s"$apacheHttpVer",     
         "com.jsuereth"               %%    "scala-arm"                     %    "1.4"
+        
        // "io.spray"                  %     "spray-client"                  %    s"1.2.2-20141105"
       //  "com.typesafe.akka"    %%    "akka-kernel"                   %    akkaVersion,
       //  "com.typesafe.akka"    %%    "akka-cluster"                  %    akkaVersion
@@ -95,7 +99,8 @@ object AlpineRConnectorBuild extends Build {
     .settings(libraryDependencies ++= Seq(
       "co.paralleluniverse" % "quasar-core" % "0.6.1",
       "ch.qos.logback" % "logback-classic" % "1.0.9",
-      "org.mockito" % "mockito-all" % "1.9.5" % "test"
+      "org.mockito" % "mockito-all" % "1.9.5" % "test",
+      "commons-io"                 %     "commons-io"                    %    "2.4"
      ))
     .settings(resourceDirectory in Compile := baseDirectory.value / "src" / "main" / "resources")
     .settings(jarName in assembly := "alpine-r-connector.jar")

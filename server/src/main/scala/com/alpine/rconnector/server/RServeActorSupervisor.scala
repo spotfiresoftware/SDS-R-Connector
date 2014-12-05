@@ -38,6 +38,8 @@ class RServeActorSupervisor extends Actor {
   private implicit val log = Logging(context.system, this)
   protected[this] val rServe = context.actorOf(Props[RServeActor])
   private var pid: Int = _
+  // TODO: use or drop
+  //  private var memUsage: MemUsage = _
 
   logActorStart(this)
 
@@ -62,6 +64,7 @@ class RServeActorSupervisor extends Actor {
 
     case PId(pid) => {
       log.info(s"Supervisor: received PId($pid)")
+      //      memUsage = new MemUsage(1024 * 1024 * 100L, pid)
       this.pid = pid
       // TODO: enable memory monitoring (see the MemUsage example below)
     }
@@ -71,6 +74,8 @@ class RServeActorSupervisor extends Actor {
       killRProcess()
       log.info(s"Killing child and restarting")
       rServe ! Kill
+      // TODO: use or drop
+      //      memUsage = new MemUsage(1024 * 1024 * 16, pid)
     }
 
     /* This is just the RException sent due to the actor being killed by the supervisor.
@@ -98,10 +103,10 @@ class RServeActorSupervisor extends Actor {
   // TODO: This isn't yet hooked up to anything
   // TODO: Base maxMem on R server settings
   // http://jezhumble.github.io/javasysmon/
-  //  private class MemUsage(maxMem: Long) {
+  //  private class MemUsage(maxMem: Long, pid: Int) {
   //    var state = true
-  //    val fiber: Strand = new Fiber() {
-  //      override protected def run() = {
+  //    val fiber: Strand = new Fiber[Unit]() {
+  //      override protected def run(): Unit = {
   //        val monitor = new JavaSysMon()
   //        val process = monitor.processTree().find(pid)
   //        while (state) {
@@ -111,17 +116,16 @@ class RServeActorSupervisor extends Actor {
   //            // TODO: send a message to the client that R exceeded the allowed memory
   //            // TODO: kill the R process and the worker actor via FinishRSession(uuid)
   //            monitor.killProcess(pid)
-  //            // or
-  //            // killRProcess()
   //            rServe ! Kill
+  //            state = false
   //          }
-  //          Thread.sleep(100L)
+  //          Fiber.sleep(100L)
   //        }
-  //
-  //        ???
   //      }
   //      // TODO: need to call cancel, or else this fiber will keep running forever, causing a leak
-  //      def cancel(): Unit = state = false
+  //      def cancel(): Unit = {
+  //        state = false
+  //      }
   //    }
   //  }
 

@@ -34,6 +34,7 @@ object RServeMain {
 
   val localTempDir = config.getString("akka.rServe.localTempDir")
   val localPort = config.getInt("akka.remote.netty.tcp.port")
+  val autoDeleteTempFiles = config.getBoolean("akka.rServe.autoDeleteTempFiles")
 
   def startup(): Unit = system.actorOf(Props[RServeMaster], "master")
   def shutdown(): Unit = system.shutdown()
