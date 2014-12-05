@@ -9,8 +9,13 @@ if (!isInstalled('Rserve')) {
   print('Installing the R-side Rserve component to local R repository')
 } 
 
-install.packages(paste(getwd(), "/Rserve_1.7-3.tar.gz", sep = ""), repos = NULL, type="source")
+fullPath <- function(fileName) {
+	return c(paste(getwd(), "/", fileName, sep = "")
+}
+
+install.packages(pkgs = c(fullPath("Rserve_1.7-3.tar.gz"), fullPath("data.table_1.9.4.tar.gz")), repos = NULL, type="source")
 library(Rserve)
+library(data.table)
 
 print('Starting R server on the R side - now start the Alpine R server')
 
