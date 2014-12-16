@@ -36,8 +36,10 @@ import resource._
 import org.apache.http.HttpStatus
 import scala.collection.mutable
 import org.apache.commons.io.IOUtils
+import org.apache.http.entity.ContentType
+import org.apache.http.client.entity.EntityBuilder
 import org.apache.http.entity.mime.{ HttpMultipartMode, MultipartEntityBuilder }
-import org.apache.http.entity.mime.content.FileBody
+import org.apache.http.entity.mime.content.{ FileBody, StringBody }
 import org.apache.http.HttpVersion
 import scala.collection.mutable.Map
 import org.apache.http.conn.ConnectTimeoutException
@@ -161,6 +163,7 @@ class RServeActor extends Actor {
 
         case e: Exception =>
           {
+            deleteTempFiles(uuid)
             val msg = e.getMessage
             val errorIn = "Error in"
             if (msg.contains(parseBoilerplate)) {
@@ -170,7 +173,9 @@ class RServeActor extends Actor {
               val leadingRegex = "[^a-zA-Z]+text[^a-zA-Z]+".r
               val finalStr = leadingRegex.replaceFirstIn(noErrorIn, "")
               throw new RuntimeException(finalStr)
+
             } else {
+
               throw e
             }
           }
@@ -181,36 +186,61 @@ class RServeActor extends Actor {
       sender ! SyntaxCheckOK(uuid)
     }
 
-    case ExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, escapeStr,
-      Some(delimiterStr), quoteStr, httpUploadUrl, httpUploadHeader
+    case HadoopExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
+      Some(delimiterStr), Some(quoteStr), httpUploadUrl, httpUploadHeader
 
       ) => {
 
-      log.info("Received ExecuteRRequest. Evaluating enriched script")
-      // execute R script
-      eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr, numPreviewRows))
+      log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
 
-      val rConsoleOutput = eval(returnNames.rConsoleOutput)
+      var rResponse: RResponse = null
 
-      val dataPreview = if (hasOutput(rScript))
-        Some(eval(returnNames.outputDataFrame.get).asInstanceOf[JMap[String, Object]])
-      else None
+      try {
 
-      if (httpUploadUrl != None && httpUploadHeader != None) {
+        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr)
+        hadoopRestUpload(httpUploadUrl, httpUploadHeader, uuid)
 
-        log.info(s"Upload URL and header are present - performing REST upload")
+      } finally {
 
-        restUpload(httpUploadUrl, httpUploadHeader, uuid)
-      }
+        if (autoDeleteTempFiles) {
 
-      if (autoDeleteTempFiles) {
+          deleteTempFiles(uuid)
+        }
 
-        log.info(s"Deleting temp files")
-        deleteTempFiles(uuid)
       }
 
       log.info(s"Sending R response to client")
-      sender ! RResponse(rConsoleOutput.asInstanceOf[Array[String]], dataPreview)
+      sender ! rResponse
+
+    }
+
+    case DBExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
+      Some(delimiterStr), Some(quoteStr), httpUploadUrl, httpUploadHeader, schemaName, tableName
+      ) => {
+
+      log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
+
+      var rResponse: RResponse = null
+
+      try {
+
+        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr)
+
+        dbRestUpload(
+          httpUploadUrl, httpUploadHeader, uuid, delimiterStr, quoteStr, escapeStr, schemaName, tableName
+        )
+
+      } finally {
+
+        if (autoDeleteTempFiles) {
+
+          deleteTempFiles(uuid)
+        }
+
+      }
+
+      log.info(s"Sending R response to client")
+      sender ! rResponse
 
     }
 
@@ -220,6 +250,11 @@ class RServeActor extends Actor {
       killRProcess()
       updateConnAndPid()
       log.info(s"Sending RSessionFinishedAck")
+
+      if (autoDeleteTempFiles) {
+        deleteTempFiles(uuid)
+      }
+
       sender ! RSessionFinishedAck(uuid)
     }
 
@@ -297,7 +332,7 @@ class RServeActor extends Actor {
 
             deleteDownloadTempFile(uuid)
           }
-          throw e
+          throw new RuntimeException(e.getMessage)
         }
 
       } finally {
@@ -323,9 +358,9 @@ class RServeActor extends Actor {
   }
 
   // mutable map is necessary due to implicit conversion from java.util.Map
-  private def restUpload(url: Option[String], header: Option[mutable.Map[String, String]], uuid: String): Unit = {
+  private def hadoopRestUpload(url: Option[String], header: Option[mutable.Map[String, String]], uuid: String): Unit = {
 
-    log.info("In restUpload")
+    log.info("In hadoopRestUpload")
     if (url != None && header != None) {
 
       val localPath = uploadLocalPath(uuid)
@@ -364,7 +399,7 @@ class RServeActor extends Actor {
 
         if (statusCode != HttpStatus.SC_OK) {
 
-          val excMsg = s"REST download of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}. Check R server log for more details."
+          val excMsg = s"REST upload of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}. Check R server log for more details."
           log.error(excMsg)
           // This will report the exception in the log
           log.error(IOUtils.toString(response.getEntity.getContent, "UTF-8"))
@@ -377,7 +412,7 @@ class RServeActor extends Actor {
 
         case e: ConnectTimeoutException => {
 
-          deleteDownloadTempFile(uuid)
+          deleteUploadTempFile(uuid)
           throw new RuntimeException(e.getMessage)
 
         }
@@ -386,9 +421,9 @@ class RServeActor extends Actor {
 
           if (autoDeleteTempFiles) {
 
-            deleteDownloadTempFile(uuid)
+            deleteTempFiles(uuid)
           }
-          throw e
+          throw new RuntimeException(e)
         }
 
       } finally {
@@ -406,11 +441,146 @@ class RServeActor extends Actor {
     }
   }
 
+  private def getDBUploadMeta(dfName: String = "alpine_input",
+    schemaName: String, tableName: String,
+    delimiter: String, quote: String, escape: String,
+    limitNum: Long = -1, includeHeader: Boolean): String = {
+
+    def getRTypes(dfName: String = "alpine_input"): JMap[String, String] =
+      conn.eval(s"as.data.frame(lapply($dfName, class), stringsAsFactors = FALSE)").asInstanceOf[JMap[String, String]]
+
+    def generateColElem(kv: (String, String), included: Boolean = true, allowEmpty: Boolean = true) =
+
+      (k: String, v: String) => {
+
+        s"""{"columnName":"$k", "columnType":"${
+          v.toLowerCase match {
+
+            case "integer" => "INTEGER"
+            case "numeric" => "DOUBLE"
+            case "logical" => "BOOLEAN"
+            case "character" => "VARCHAR"
+            case "factor" => "VARCHAR"
+            case _ => "VARCHAR"
+          }
+        }","isInclude":"$included","allowEmpty":"$allowEmpty"}""".stripMargin
+
+      }
+
+    s"""fileMetadata={"schemaName":"$schemaName","tableName":"$tableName","delimiter":"$delimiter","quote":"${quote}", "escape":"${escape}", "limitNum": $limitNum, "includeHeader": $includeHeader,"structure": [${getRTypes(dfName).map(kv => generateColElem(kv)).mkString(",")}]}""".stripMargin
+  }
+
+  private def dbRestUpload(url: Option[String], header: Option[mutable.Map[String, String]], uuid: String,
+    delimiterStr: String, quoteStr: String, escapeStr: String,
+    schemaName: Option[String], tableName: Option[String]): Unit = {
+
+    log.info("In dbRestUpload")
+
+    if (url != None && header != None && schemaName != None && tableName != None) {
+
+      val localPath = uploadLocalPath(uuid)
+
+      log.info("Making file upload REST call")
+
+      // TODO: refactor with try-with-resources (Josh Suereth's scala-arm library)
+      var client: CloseableHttpClient = null
+      var post: HttpPost = null
+
+      try {
+
+        client = HttpClientBuilder.create().build()
+
+        post = new HttpPost(url.get)
+
+        //          header.get.foreach { case (k, v) => post.setHeader(k, v)}
+
+        val entity = MultipartEntityBuilder
+          .create()
+          .setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
+          .addBinaryBody("file", new File(localPath))
+
+        // These are form elements, not header elements
+        header.get.foreach {
+          case (k, v) =>
+
+            entity.addPart(k, new StringBody(v, ContentType.TEXT_PLAIN))
+
+        }
+
+        val metadata = getDBUploadMeta(
+          dfName = "alpine_input",
+          schemaName = schemaName.get,
+          tableName = tableName.get,
+          delimiter = delimiterStr,
+          quote = quoteStr,
+          escape = escapeStr,
+          limitNum = -1,
+          includeHeader = true
+        )
+
+        entity.addPart("fileMetadata", new StringBody(metadata, ContentType.TEXT_PLAIN))
+
+        post.setEntity(entity.build())
+
+        val response = client.execute(post)
+        val statusLine = response.getStatusLine
+        val statusCode = statusLine.getStatusCode
+
+        if (statusCode != HttpStatus.SC_OK) {
+
+          val excMsg = s"REST upload of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}. Check R server log for more details."
+          log.error(excMsg)
+          // This will report the exception in the log
+          log.error(IOUtils.toString(response.getEntity.getContent, "UTF-8"))
+          throw new RuntimeException(excMsg)
+        }
+
+        log.info(s"File $localPath uploaded successfully")
+
+      } catch {
+
+        case e: ConnectTimeoutException => {
+
+          if (autoDeleteTempFiles) {
+
+            deleteTempFiles(uuid)
+
+          }
+
+          throw new RuntimeException(e.getMessage)
+
+        }
+
+        case e: Exception => {
+
+          if (autoDeleteTempFiles) {
+
+            deleteTempFiles(uuid)
+          }
+          throw new RuntimeException(e)
+        }
+
+      } finally {
+
+        if (client != null) {
+
+          client.close()
+        }
+
+        if (post != null) {
+
+          post.releaseConnection()
+        }
+      }
+
+    }
+  }
+
   private def deleteTempFile(localPath: String, ifExists: Boolean = true): Unit =
     Try(new File(localPath).delete()) match {
 
       case Success(_) =>
-      case Failure(err) => if (!ifExists) throw err
+      case Failure(err) => if (!ifExists) throw new RuntimeException(err.getMessage)
     }
 
   private def deleteDownloadTempFile(uuid: String): Unit = deleteTempFile(downloadLocalPath(uuid))
@@ -462,5 +632,24 @@ class RServeActor extends Actor {
   private def hasInput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_input", "#")
 
   private def hasOutput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_output", "#")
+
+  private def processRequest(uuid: String, rScript: String, returnNames: ReturnNames,
+    numPreviewRows: Long, escapeStr: String, delimiterStr: String, quoteStr: String): RResponse = {
+
+    var rConsoleOutput: Array[String] = null
+    var dataPreview: Option[JMap[String, Object]] = None
+
+    // execute R script
+    eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr, numPreviewRows))
+
+    rConsoleOutput = eval(returnNames.rConsoleOutput).asInstanceOf[Array[String]]
+
+    dataPreview = if (hasOutput(rScript))
+      Some(eval(returnNames.outputDataFrame.get).asInstanceOf[JMap[String, Object]])
+    else None
+
+    RResponse(rConsoleOutput, dataPreview)
+
+  }
 
 }

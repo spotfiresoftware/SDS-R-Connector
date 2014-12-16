@@ -93,7 +93,7 @@ case class SyntaxCheckRequest(
  * @param httpUploadUrl
  * @param httpUploadHeader
  */
-case class ExecuteRRequest(
+class ExecuteRRequest(
   override val uuid: String,
   override val rScript: String,
   override val returnNames: Some[ReturnNames],
@@ -104,6 +104,71 @@ case class ExecuteRRequest(
   override val httpUploadUrl: Option[String] = None,
   override val httpUploadHeader: Option[Map[String, String]] = None)
     extends RRequest(uuid, rScript, returnNames, numPreviewRows)
+
+object ExecuteRRequest {
+
+  def unapply(req: ExecuteRRequest) =
+    Some(req.uuid, req.rScript, req.returnNames, req.numPreviewRows,
+      req.escapeStr, req.delimiterStr, req.quoteStr,
+      req.httpUploadUrl, req.httpUploadHeader
+    )
+}
+
+/**
+ *
+ * @param uuid
+ * @param rScript
+ * @param returnNames
+ * @param numPreviewRows
+ * @param escapeStr
+ * @param delimiterStr
+ * @param quoteStr
+ * @param httpUploadUrl
+ * @param httpUploadHeader
+ */
+case class HadoopExecuteRRequest(
+  override val uuid: String,
+  override val rScript: String,
+  override val returnNames: Some[ReturnNames],
+  override val numPreviewRows: Long = 1000,
+  override val escapeStr: Option[String] = None,
+  override val delimiterStr: Option[String] = None,
+  override val quoteStr: Option[String] = None,
+  override val httpUploadUrl: Option[String] = None,
+  override val httpUploadHeader: Option[Map[String, String]] = None)
+    extends ExecuteRRequest(
+      uuid, rScript, returnNames, numPreviewRows, escapeStr,
+      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+    )
+
+/**
+ *
+ * @param uuid
+ * @param rScript
+ * @param returnNames
+ * @param numPreviewRows
+ * @param escapeStr
+ * @param delimiterStr
+ * @param quoteStr
+ * @param httpUploadUrl
+ * @param httpUploadHeader
+ */
+case class DBExecuteRRequest(
+  override val uuid: String,
+  override val rScript: String,
+  override val returnNames: Some[ReturnNames],
+  override val numPreviewRows: Long = 1000,
+  override val escapeStr: Option[String] = None,
+  override val delimiterStr: Option[String] = None,
+  override val quoteStr: Option[String] = None,
+  override val httpUploadUrl: Option[String] = None,
+  override val httpUploadHeader: Option[Map[String, String]] = None,
+  val schemaName: Option[String] = None,
+  val tableName: Option[String] = None)
+    extends ExecuteRRequest(
+      uuid, rScript, returnNames, numPreviewRows, escapeStr,
+      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+    )
 
 /**
  *
