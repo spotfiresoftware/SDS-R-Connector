@@ -163,8 +163,8 @@ case class DBExecuteRRequest(
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
   override val httpUploadHeader: Option[Map[String, String]] = None,
-  val schemaName: Option[String] = None,
-  val tableName: Option[String] = None)
+  val schemaName: Option[String],
+  val tableName: Option[String])
     extends ExecuteRRequest(
       uuid, rScript, returnNames, numPreviewRows, escapeStr,
       delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader

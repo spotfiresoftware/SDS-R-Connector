@@ -45,6 +45,9 @@ import scala.collection.mutable.Map
 import org.apache.http.conn.ConnectTimeoutException
 import java.util.{ Map => JMap }
 
+import org.apache.commons.lang3.StringEscapeUtils
+import StringEscapeUtils.escapeJava
+
 import scala.util.{ Failure, Try, Success }
 
 import RServeMain.autoDeleteTempFiles
@@ -227,7 +230,8 @@ class RServeActor extends Actor {
         rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr)
 
         dbRestUpload(
-          httpUploadUrl, httpUploadHeader, uuid, delimiterStr, quoteStr, escapeStr, schemaName, tableName
+          httpUploadUrl, httpUploadHeader, uuid, delimiterStr, quoteStr, escapeStr,
+          schemaName, tableName
         )
 
       } finally {
@@ -446,28 +450,37 @@ class RServeActor extends Actor {
     delimiter: String, quote: String, escape: String,
     limitNum: Long = -1, includeHeader: Boolean): String = {
 
-    def getRTypes(dfName: String = "alpine_input"): JMap[String, String] =
-      conn.eval(s"as.data.frame(lapply($dfName, class), stringsAsFactors = FALSE)").asInstanceOf[JMap[String, String]]
+    def getRTypes(dfName: String = "alpine_input"): JMap[String, Array[String]] =
+      conn.eval(s"as.data.frame(lapply($dfName, class), stringsAsFactors = FALSE)")
+        .asNativeJavaObject()
+        .asInstanceOf[JMap[String, Array[String]]]
 
-    def generateColElem(kv: (String, String), included: Boolean = true, allowEmpty: Boolean = true) =
+    def generateColElem(kv: (String, Array[String]), included: Boolean = true, allowEmpty: Boolean = true) =
 
-      (k: String, v: String) => {
+      kv match {
 
-        s"""{"columnName":"$k", "columnType":"${
-          v.toLowerCase match {
+        case (k: String, v: Array[String]) => {
 
-            case "integer" => "INTEGER"
-            case "numeric" => "DOUBLE"
-            case "logical" => "BOOLEAN"
-            case "character" => "VARCHAR"
-            case "factor" => "VARCHAR"
-            case _ => "VARCHAR"
-          }
-        }","isInclude":"$included","allowEmpty":"$allowEmpty"}""".stripMargin
+          s"""{"columnName":"$k","columnType":"${
+            v(0).toLowerCase match {
 
+              case "integer" => "INTEGER"
+              case "numeric" => "DOUBLE"
+              case "logical" => "BOOLEAN"
+              case "character" => "VARCHAR"
+              case "factor" => "VARCHAR"
+              case _ => "VARCHAR"
+            }
+          }","isInclude":"$included","allowEmpty":"$allowEmpty"}""".stripMargin
+        }
       }
 
-    s"""fileMetadata={"schemaName":"$schemaName","tableName":"$tableName","delimiter":"$delimiter","quote":"${quote}", "escape":"${escape}", "limitNum": $limitNum, "includeHeader": $includeHeader,"structure": [${getRTypes(dfName).map(kv => generateColElem(kv)).mkString(",")}]}""".stripMargin
+    val getRT = getRTypes(dfName)
+    val types = getRT.map(kv => generateColElem(kv)).mkString(",")
+
+    println(s"\n\ntypes\n\n$types\n\n")
+
+    s"""{"schemaName":"$schemaName","tableName":"$tableName","delimiter":"${escapeJava(delimiter)}","quote":"${escapeJava(quote)}","escape":"${escapeJava(escape)}","limitNum":$limitNum,"includeHeader":$includeHeader,"structure":[$types]}""".stripMargin
   }
 
   private def dbRestUpload(url: Option[String], header: Option[mutable.Map[String, String]], uuid: String,
@@ -520,7 +533,11 @@ class RServeActor extends Actor {
 
         entity.addPart("fileMetadata", new StringBody(metadata, ContentType.TEXT_PLAIN))
 
+        println(s"\n\nURL is ${url.get} \n\n")
+
         post.setEntity(entity.build())
+
+        println(s"\n\nMetadata\n\n${metadata.toString}\n\n")
 
         val response = client.execute(post)
         val statusLine = response.getStatusLine
@@ -538,18 +555,6 @@ class RServeActor extends Actor {
         log.info(s"File $localPath uploaded successfully")
 
       } catch {
-
-        case e: ConnectTimeoutException => {
-
-          if (autoDeleteTempFiles) {
-
-            deleteTempFiles(uuid)
-
-          }
-
-          throw new RuntimeException(e.getMessage)
-
-        }
 
         case e: Exception => {
 

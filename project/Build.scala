@@ -60,6 +60,7 @@ object AlpineRConnectorBuild extends Build {
         "org.spark-project.akka"     %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
         "org.spark-project.akka"     %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
         "org.spark-project.akka"     %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test",
+        "org.apache.commons"         %     "commons-lang3"                 %    "3.3.2",
         "org.apache.httpcomponents"  %     "httpclient"                    %    s"$apacheHttpVer",   
         "org.apache.httpcomponents"  %     "httpcore"                      %    s"$apacheHttpVer",   
         "org.apache.httpcomponents"  %     "httpmime"                      %    s"$apacheHttpVer",     
