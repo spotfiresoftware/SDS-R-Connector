@@ -18,7 +18,7 @@
 package com.alpine.rconnector.messages
 
 import scala.collection.mutable.Map
-import java.util.{ Map => JMap }
+import java.util.{ List => JList, Map => JMap }
 
 /**
  * Messages for communication between Alpine's backend and the R server.
@@ -135,7 +135,8 @@ case class HadoopExecuteRRequest(
   override val delimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[Map[String, String]] = None)
+  override val httpUploadHeader: Option[Map[String, String]] = None,
+  val columnNames: Option[JList[String]] = None)
     extends ExecuteRRequest(
       uuid, rScript, returnNames, numPreviewRows, escapeStr,
       delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader

@@ -15,42 +15,29 @@
 
 package com.alpine.rconnector.server
 
-import java.io.{ StringWriter, FileInputStream, FileOutputStream, File }
+import com.alpine.rconnector.messages._
 
-import org.apache.http.HttpVersion
-import org.apache.http.client.methods.{ HttpPost, HttpGet }
-import org.apache.http.entity.{ ContentType, FileEntity }
-import org.rosuda.REngine.Rserve.RConnection
 import akka.AkkaException
 import akka.actor.Actor
-import com.alpine.rconnector.messages._
 import akka.event.Logging
-import org.rosuda.REngine.REXP
-import org.apache.http.impl.client.{ CloseableHttpClient, HttpClientBuilder }
-import scala.collection.JavaConversions._
-import com.alpine.rconnector.messages._
-import java.util.{ UUID }
-import scala.collection.mutable.{ HashMap => MutableHashMap }
-import scala.sys.process._
-import resource._
-import org.apache.http.HttpStatus
-import scala.collection.mutable
+import java.io.{ StringWriter, FileInputStream, FileOutputStream, File }
+import java.util.{ List => JList, Map => JMap }
 import org.apache.commons.io.IOUtils
-import org.apache.http.entity.ContentType
-import org.apache.http.client.entity.EntityBuilder
+import org.apache.commons.lang3.StringEscapeUtils.escapeJava
+import org.apache.http.{ HttpStatus, HttpVersion }
+import org.apache.http.client.methods.{ HttpPost, HttpGet }
+import org.apache.http.conn.ConnectTimeoutException
+import org.apache.http.entity.{ ContentType, FileEntity }
 import org.apache.http.entity.mime.{ HttpMultipartMode, MultipartEntityBuilder }
 import org.apache.http.entity.mime.content.{ FileBody, StringBody }
-import org.apache.http.HttpVersion
-import scala.collection.mutable.Map
-import org.apache.http.conn.ConnectTimeoutException
-import java.util.{ Map => JMap }
-
-import org.apache.commons.lang3.StringEscapeUtils
-import StringEscapeUtils.escapeJava
-
-import scala.util.{ Failure, Try, Success }
-
+import org.apache.http.impl.client.{ CloseableHttpClient, HttpClientBuilder }
+import org.rosuda.REngine.REXP
+import org.rosuda.REngine.Rserve.RConnection
 import RServeMain.autoDeleteTempFiles
+import scala.collection.mutable.Map
+import scala.collection.JavaConversions._
+import scala.sys.process._
+import scala.util.{ Failure, Try, Success }
 
 /**
  * This is the actor that establishes a connection to R via Rserve
@@ -190,7 +177,7 @@ class RServeActor extends Actor {
     }
 
     case HadoopExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
-      Some(delimiterStr), Some(quoteStr), httpUploadUrl, httpUploadHeader
+      Some(delimiterStr), Some(quoteStr), httpUploadUrl, httpUploadHeader, columnNames
 
       ) => {
 
@@ -200,7 +187,9 @@ class RServeActor extends Actor {
 
       try {
 
-        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr)
+        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows,
+          escapeStr, delimiterStr, quoteStr, columnNames
+        )
         hadoopRestUpload(httpUploadUrl, httpUploadHeader, uuid)
 
       } finally {
@@ -227,7 +216,7 @@ class RServeActor extends Actor {
 
       try {
 
-        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr)
+        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr, None)
 
         dbRestUpload(
           httpUploadUrl, httpUploadHeader, uuid, delimiterStr, quoteStr, escapeStr,
@@ -362,7 +351,7 @@ class RServeActor extends Actor {
   }
 
   // mutable map is necessary due to implicit conversion from java.util.Map
-  private def hadoopRestUpload(url: Option[String], header: Option[mutable.Map[String, String]], uuid: String): Unit = {
+  private def hadoopRestUpload(url: Option[String], header: Option[Map[String, String]], uuid: String): Unit = {
 
     log.info("In hadoopRestUpload")
     if (url != None && header != None) {
@@ -445,15 +434,16 @@ class RServeActor extends Actor {
     }
   }
 
-  private def getDBUploadMeta(dfName: String = "alpine_input",
+  private def getDBUploadMeta(dfName: String = "alpine_output",
     schemaName: String, tableName: String,
     delimiter: String, quote: String, escape: String,
     limitNum: Long = -1, includeHeader: Boolean): String = {
 
-    def getRTypes(dfName: String = "alpine_input"): JMap[String, Array[String]] =
-      conn.eval(s"as.data.frame(lapply($dfName, class), stringsAsFactors = FALSE)")
-        .asNativeJavaObject()
+    def getRTypes(dfName: String = "alpine_output"): JMap[String, Array[String]] = {
+      eval(s"as.data.frame(lapply($dfName, class), stringsAsFactors = FALSE)")
         .asInstanceOf[JMap[String, Array[String]]]
+
+    }
 
     def generateColElem(kv: (String, Array[String]), included: Boolean = true, allowEmpty: Boolean = true) =
 
@@ -483,7 +473,7 @@ class RServeActor extends Actor {
     s"""{"schemaName":"$schemaName","tableName":"$tableName","delimiter":"${escapeJava(delimiter)}","quote":"${escapeJava(quote)}","escape":"${escapeJava(escape)}","limitNum":$limitNum,"includeHeader":$includeHeader,"structure":[$types]}""".stripMargin
   }
 
-  private def dbRestUpload(url: Option[String], header: Option[mutable.Map[String, String]], uuid: String,
+  private def dbRestUpload(url: Option[String], header: Option[Map[String, String]], uuid: String,
     delimiterStr: String, quoteStr: String, escapeStr: String,
     schemaName: Option[String], tableName: Option[String]): Unit = {
 
@@ -521,7 +511,7 @@ class RServeActor extends Actor {
         }
 
         val metadata = getDBUploadMeta(
-          dfName = "alpine_input",
+          dfName = "alpine_output",
           schemaName = schemaName.get,
           tableName = tableName.get,
           delimiter = delimiterStr,
@@ -603,7 +593,10 @@ class RServeActor extends Actor {
     inputPath: String,
     outputPath: String,
     delimiterStr: String,
-    previewNumRows: Long): String = {
+    previewNumRows: Long,
+    columnNames: Option[JList[String]]): String = {
+
+    def assignColumnNames(objName: String, l: JList[String]) = l.mkString(s"""names($objName) <- c('""", "', '", "')")
 
     val enrichedScript = s"""
             $consoleOutputVar <- capture.output({
@@ -611,6 +604,8 @@ class RServeActor extends Actor {
             library(data.table);
 
             ${if (hasInput(rawScript)) s"alpine_input <- fread(input='$inputPath', sep='$delimiterStr');" else ""}
+
+            ${if (columnNames != None) assignColumnNames("alpine_input", columnNames.get) else ""}
 
             $rawScript
 
@@ -639,13 +634,15 @@ class RServeActor extends Actor {
   private def hasOutput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_output", "#")
 
   private def processRequest(uuid: String, rScript: String, returnNames: ReturnNames,
-    numPreviewRows: Long, escapeStr: String, delimiterStr: String, quoteStr: String): RResponse = {
+    numPreviewRows: Long, escapeStr: String, delimiterStr: String, quoteStr: String,
+    columnNames: Option[JList[String]]): RResponse = {
 
     var rConsoleOutput: Array[String] = null
     var dataPreview: Option[JMap[String, Object]] = None
 
     // execute R script
-    eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid), uploadLocalPath(uuid), delimiterStr, numPreviewRows))
+    eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid),
+      uploadLocalPath(uuid), delimiterStr, numPreviewRows, columnNames))
 
     rConsoleOutput = eval(returnNames.rConsoleOutput).asInstanceOf[Array[String]]
 
