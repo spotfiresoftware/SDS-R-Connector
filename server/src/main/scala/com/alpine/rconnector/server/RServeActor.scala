@@ -262,7 +262,7 @@ class RServeActor extends Actor {
 
   // client will pass in the header info, depending on whether it's DB or Hadoop
   // mutable map is necessary due to implicit conversion from java.util.Map
-  private def restDownload(url: Option[String], header: Option[Map[String, String]], uuid: String): Unit = {
+  private def restDownload(url: Option[String], header: Option[JMap[String, String]], uuid: String): Unit = {
 
     if (url != None && header != None) {
 
@@ -351,7 +351,7 @@ class RServeActor extends Actor {
   }
 
   // mutable map is necessary due to implicit conversion from java.util.Map
-  private def hadoopRestUpload(url: Option[String], header: Option[Map[String, String]], uuid: String): Unit = {
+  private def hadoopRestUpload(url: Option[String], header: Option[JMap[String, String]], uuid: String): Unit = {
 
     log.info("In hadoopRestUpload")
     if (url != None && header != None) {
@@ -473,7 +473,7 @@ class RServeActor extends Actor {
     s"""{"schemaName":"$schemaName","tableName":"$tableName","delimiter":"${escapeJava(delimiter)}","quote":"${escapeJava(quote)}","escape":"${escapeJava(escape)}","limitNum":$limitNum,"includeHeader":$includeHeader,"structure":[$types]}""".stripMargin
   }
 
-  private def dbRestUpload(url: Option[String], header: Option[Map[String, String]], uuid: String,
+  private def dbRestUpload(url: Option[String], header: Option[JMap[String, String]], uuid: String,
     delimiterStr: String, quoteStr: String, escapeStr: String,
     schemaName: Option[String], tableName: Option[String]): Unit = {
 

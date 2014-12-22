@@ -17,7 +17,6 @@
 
 package com.alpine.rconnector.messages
 
-import scala.collection.mutable.Map
 import java.util.{ List => JList, Map => JMap }
 
 /**
@@ -57,7 +56,7 @@ sealed class RRequest(
   val delimiterStr: Option[String] = None,
   val quoteStr: Option[String] = None,
   val httpUploadUrl: Option[String] = None,
-  val httpUploadHeader: Option[Map[String, String]] = None) extends Message
+  val httpUploadHeader: Option[JMap[String, String]] = None) extends Message
 
 object RRequest {
 
@@ -102,7 +101,7 @@ class ExecuteRRequest(
   override val delimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[Map[String, String]] = None)
+  override val httpUploadHeader: Option[JMap[String, String]] = None)
     extends RRequest(uuid, rScript, returnNames, numPreviewRows)
 
 object ExecuteRRequest {
@@ -135,7 +134,7 @@ case class HadoopExecuteRRequest(
   override val delimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[Map[String, String]] = None,
+  override val httpUploadHeader: Option[JMap[String, String]] = None,
   val columnNames: Option[JList[String]] = None)
     extends ExecuteRRequest(
       uuid, rScript, returnNames, numPreviewRows, escapeStr,
@@ -163,7 +162,7 @@ case class DBExecuteRRequest(
   override val delimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[Map[String, String]] = None,
+  override val httpUploadHeader: Option[JMap[String, String]] = None,
   val schemaName: Option[String],
   val tableName: Option[String])
     extends ExecuteRRequest(
@@ -180,9 +179,9 @@ case class DBExecuteRRequest(
  */
 case class RAssign(
   val uuid: String,
-  val objects: Map[String, Any],
+  val objects: JMap[String, Any],
   val httpDownloadUrl: Option[String] = None,
-  val httpDownloadHeader: Option[Map[String, String]] = None) extends Message
+  val httpDownloadHeader: Option[JMap[String, String]] = None) extends Message
 
 /**
  *
