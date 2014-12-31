@@ -21,16 +21,19 @@ import akka.AkkaException
 import akka.actor.Actor
 import akka.event.Logging
 import java.io.{ StringWriter, FileInputStream, FileOutputStream, File }
+import java.security.{ SecureRandom, KeyStore }
 import java.util.{ List => JList, Map => JMap }
+import javax.net.ssl.{ TrustManager, KeyManager, SSLContext }
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 import org.apache.http.{ HttpStatus, HttpVersion }
 import org.apache.http.client.methods.{ HttpPost, HttpGet }
 import org.apache.http.conn.ConnectTimeoutException
+import org.apache.http.conn.ssl.{ SSLConnectionSocketFactory, SSLContexts, TrustSelfSignedStrategy }
 import org.apache.http.entity.{ ContentType, FileEntity }
 import org.apache.http.entity.mime.{ HttpMultipartMode, MultipartEntityBuilder }
 import org.apache.http.entity.mime.content.{ FileBody, StringBody }
-import org.apache.http.impl.client.{ CloseableHttpClient, HttpClientBuilder }
+import org.apache.http.impl.client.{ CloseableHttpClient, HttpClients, HttpClientBuilder }
 import org.rosuda.REngine.REXP
 import org.rosuda.REngine.Rserve.RConnection
 import RServeMain.autoDeleteTempFiles
@@ -58,6 +61,19 @@ class RServeActor extends Actor {
   val downloadExtension = "download"
   val uploadExtension = "upload"
   val parseBoilerplate = "parse(text = rawScript)"
+
+  // trust self-signed SSL certificates
+  val trustStore = KeyStore.getInstance(KeyStore.getDefaultType)
+  val sslCtx = SSLContexts.custom().loadTrustMaterial(trustStore, new TrustSelfSignedStrategy()).build()
+  val sslConnFactory = new SSLConnectionSocketFactory(sslCtx,
+    Array("SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2"), null,
+    SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+
+  /* Note: ALLOW_ALL_HOSTNAME_VERIFIER doesn't check domain correctness, e.g. it will accept
+     localhost/127.0.0.1 instead of alpineqa3.alpinenow.local/10.0.0.204
+     Set to BROWSER_COMPATIBLE_HOSTNAME_VERIFIER and use correctly issued
+     SSL certificates if this is a problem.
+   */
 
   def updateConnAndPid() = {
 
@@ -260,6 +276,22 @@ class RServeActor extends Actor {
 
   }
 
+  /*
+        // configure the SSLContext with a TrustManager
+
+        URL url = new URL("https://mms.nw.ru");
+        HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+        conn.setHostnameVerifier(new HostnameVerifier() {
+            @Override
+            public boolean verify(String arg0, SSLSession arg1) {
+                return true;
+            }
+        });
+        System.out.println(conn.getResponseCode());
+        conn.disconnect();
+    }
+ */
+
   // client will pass in the header info, depending on whether it's DB or Hadoop
   // mutable map is necessary due to implicit conversion from java.util.Map
   private def restDownload(url: Option[String], header: Option[JMap[String, String]], uuid: String): Unit = {
@@ -281,7 +313,11 @@ class RServeActor extends Actor {
 
       try {
 
-        client = HttpClientBuilder.create().build()
+        client = HttpClients.custom().setSSLSocketFactory(sslConnFactory).build()
+
+        //        client = HttpClientBuilder
+        //          .create() //  .setHostnameVerifier(new DefaultHostnameVerifier())
+        //          .build()
         fos = new FileOutputStream(new File(localPath))
 
         get = new HttpGet(url.get) {
@@ -369,7 +405,9 @@ class RServeActor extends Actor {
 
       try {
 
-        client = HttpClientBuilder.create().build()
+        client = HttpClients.custom().setSSLSocketFactory(sslConnFactory).build()
+
+        //        client = HttpClientBuilder.create().build()
 
         post = new HttpPost(url.get) {
 
