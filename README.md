@@ -127,6 +127,11 @@ or you can publish it in your favorite repository management system, such as Art
 
 See project/Build.scala for an example.
 
+Important
+---------
+
+When developing Alpine, please note that currently, the database R Execute REST APIs require SSL, so you will need SSL even in dev mode. Check the [Chorus documentation](https://github.com/Chorus/chorus/wiki/Generating-a-self-signed-SSL-Certificate-using-OpenSSL) to see how to set this up locally.
+
 
 Final Notes
 -----------
