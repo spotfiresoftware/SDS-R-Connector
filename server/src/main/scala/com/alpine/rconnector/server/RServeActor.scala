@@ -529,7 +529,7 @@ class RServeActor extends Actor {
 
       try {
 
-        client = HttpClientBuilder.create().build()
+        client = HttpClients.custom().setSSLSocketFactory(sslConnFactory).build()
 
         post = new HttpPost(url.get)
 
