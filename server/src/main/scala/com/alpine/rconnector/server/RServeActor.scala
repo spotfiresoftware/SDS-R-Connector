@@ -653,7 +653,13 @@ class RServeActor extends Actor {
         s"""# write temp table to disk
                   write.table(x = alpine_output, file='$outputPath', sep='$delimiterStr', append=FALSE, quote=FALSE, row.names=FALSE)
                   # preview this many rows in UI
+                  # need to handle a degenerate case of a single-column data frame, which will be type coerced by R
+                  alpineOutputColNames <- names(alpine_output)
                   alpine_output <- alpine_output[1:min($previewNumRows, nrow(alpine_output)),]
+                  if (class(alpine_output) != 'data.frame') {
+                    alpine_output <- as.data.frame(alpine_output)
+                    names(alpine_output) <- alpineOutputColNames
+                  }
                 """
       else ""
     }
