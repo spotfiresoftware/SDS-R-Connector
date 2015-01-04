@@ -33,7 +33,7 @@ import org.apache.http.conn.ssl.{ SSLConnectionSocketFactory, SSLContexts, Trust
 import org.apache.http.entity.{ ContentType, FileEntity }
 import org.apache.http.entity.mime.{ HttpMultipartMode, MultipartEntityBuilder }
 import org.apache.http.entity.mime.content.{ FileBody, StringBody }
-import org.apache.http.impl.client.{ CloseableHttpClient, HttpClients, HttpClientBuilder }
+import org.apache.http.impl.client.{ CloseableHttpClient, HttpClients, HttpClientBuilder, LaxRedirectStrategy }
 import org.rosuda.REngine.REXP
 import org.rosuda.REngine.Rserve.RConnection
 import RServeMain.autoDeleteTempFiles
@@ -313,7 +313,10 @@ class RServeActor extends Actor {
 
       try {
 
-        client = HttpClients.custom().setSSLSocketFactory(sslConnFactory).build()
+        client = HttpClients.custom()
+          .setSSLSocketFactory(sslConnFactory)
+          .setRedirectStrategy(new LaxRedirectStrategy())
+          .build()
 
         //        client = HttpClientBuilder
         //          .create() //  .setHostnameVerifier(new DefaultHostnameVerifier())
@@ -405,9 +408,15 @@ class RServeActor extends Actor {
 
       try {
 
-        client = HttpClients.custom().setSSLSocketFactory(sslConnFactory).build()
+        client = HttpClients
+          .custom()
+          .setSSLSocketFactory(sslConnFactory)
+          .setRedirectStrategy(new LaxRedirectStrategy())
+          .build()
 
         //        client = HttpClientBuilder.create().build()
+
+        println(s"\n\nHTTP POST to URL ${url.get}\n\n")
 
         post = new HttpPost(url.get) {
 
@@ -529,7 +538,11 @@ class RServeActor extends Actor {
 
       try {
 
-        client = HttpClients.custom().setSSLSocketFactory(sslConnFactory).build()
+        client = HttpClients
+          .custom()
+          .setSSLSocketFactory(sslConnFactory)
+          .setRedirectStrategy(new LaxRedirectStrategy())
+          .build()
 
         post = new HttpPost(url.get)
 
@@ -651,6 +664,9 @@ class RServeActor extends Actor {
       if (hasOutput(rawScript))
 
         s"""# write temp table to disk
+                  if (class(alpine_output) != 'data.frame') {
+                    stop(sprintf('Class of alpine_output is not data.frame but %s. Did you try to return something other than a data frame or did R coerce the type?', class(alpine_output)))
+                  }
                   write.table(x = alpine_output, file='$outputPath', sep='$delimiterStr', append=FALSE, quote=FALSE, row.names=FALSE)
                   # preview this many rows in UI
                   # need to handle a degenerate case of a single-column data frame, which will be type coerced by R
