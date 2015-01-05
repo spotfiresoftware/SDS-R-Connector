@@ -127,6 +127,12 @@ or you can publish it in your favorite repository management system, such as Art
 
 See project/Build.scala for an example.
 
+Startup/shutdown
+----------------
+
+When Alpine is deployed, provided that R is already installed, Rserve (native R TCP listener) and Java R connector processes can be started using the [start_services.sh](https://github.com/alpinedatalabs/alpine-r/blob/master/scripts/start_services.sh) and [stop_services.sh](https://github.com/alpinedatalabs/alpine-r/blob/master/scripts/stop_services.sh) shell scripts. If you have access to Alpine's Confluence Wiki documentation, also read [this page](https://alpine.atlassian.net/wiki/display/V5/R+Execute) (along with the comments).
+
+
 Important
 ---------
 
