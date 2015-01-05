@@ -33,4 +33,6 @@ echo "R-side service started."
 echo "Starting Java-side service. Its log will be found in AlpineRConnector.log"
 nohup java -Xmx4096M -Xms1024M -XX:MaxPermSize=512M -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -Dconfig.file=./application.conf -jar ./alpine-r-connector.jar &> AlpineRConnector.log &
 
+echo $! > java-r-server.pid
+
 echo "Done - check start_R_component.Rout and AlpineRConnector.log if you are experiencing problems."
