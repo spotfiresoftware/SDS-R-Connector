@@ -315,7 +315,7 @@ class RServeActor extends Actor {
 
         client = HttpClients.custom()
           .setSSLSocketFactory(sslConnFactory)
-          .setRedirectStrategy(new LaxRedirectStrategy())
+          .setRedirectStrategy(new LaxPostRedirectStrategy()) // LaxRedirectStrategy
           .build()
 
         //        client = HttpClientBuilder
@@ -411,7 +411,7 @@ class RServeActor extends Actor {
         client = HttpClients
           .custom()
           .setSSLSocketFactory(sslConnFactory)
-          .setRedirectStrategy(new LaxRedirectStrategy())
+          .setRedirectStrategy(new LaxPostRedirectStrategy()) // LaxRedirectStrategy
           .build()
 
         //        client = HttpClientBuilder.create().build()
@@ -541,7 +541,7 @@ class RServeActor extends Actor {
         client = HttpClients
           .custom()
           .setSSLSocketFactory(sslConnFactory)
-          .setRedirectStrategy(new LaxRedirectStrategy())
+          .setRedirectStrategy(new LaxPostRedirectStrategy()) // LaxRedirectStrategy
           .build()
 
         post = new HttpPost(url.get)
@@ -654,7 +654,7 @@ class RServeActor extends Actor {
 
             library(data.table);
 
-            ${if (hasInput(rawScript)) s"alpine_input <- fread(input='$inputPath', sep='$delimiterStr');" else ""}
+            ${if (hasInput(rawScript)) s"alpine_input <- as.data.frame(fread(input='$inputPath', sep='$delimiterStr'));" else ""}
 
             ${if (columnNames != None) assignColumnNames("alpine_input", columnNames.get) else ""}
 
