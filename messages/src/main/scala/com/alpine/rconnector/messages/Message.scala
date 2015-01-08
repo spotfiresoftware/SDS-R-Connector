@@ -42,6 +42,7 @@ case class ReturnNames(rConsoleOutput: String, outputDataFrame: Option[String] =
  * @param returnNames
  * @param numPreviewRows
  * @param escapeStr
+ * @param inputDelimiterStr
  * @param delimiterStr
  * @param quoteStr
  * @param httpUploadUrl
@@ -53,7 +54,8 @@ sealed class RRequest(
   val returnNames: Option[ReturnNames] = None,
   val numPreviewRows: Long = 1000,
   val escapeStr: Option[String] = None,
-  val delimiterStr: Option[String] = None,
+  val inputDelimiterStr: Option[String] = None,
+  val outputDelimiterStr: Option[String] = None,
   val quoteStr: Option[String] = None,
   val httpUploadUrl: Option[String] = None,
   val httpUploadHeader: Option[JMap[String, String]] = None) extends Message
@@ -66,8 +68,8 @@ object RRequest {
    * @return
    */
   def unapply(req: RRequest) =
-    Some(req.uuid, req.rScript, req.returnNames, req.numPreviewRows, req.escapeStr,
-      req.delimiterStr, req.quoteStr, req.httpUploadUrl, req.httpUploadHeader)
+    Some(req.uuid, req.rScript, req.returnNames, req.numPreviewRows, req.escapeStr, req.inputDelimiterStr,
+      req.outputDelimiterStr, req.quoteStr, req.httpUploadUrl, req.httpUploadHeader)
 }
 
 /**
@@ -87,7 +89,8 @@ case class SyntaxCheckRequest(
  * @param returnNames
  * @param numPreviewRows
  * @param escapeStr
- * @param delimiterStr
+ * @param inputDelimiterStr
+ * @param outputDelimiterStr
  * @param quoteStr
  * @param httpUploadUrl
  * @param httpUploadHeader
@@ -98,7 +101,8 @@ class ExecuteRRequest(
   override val returnNames: Some[ReturnNames],
   override val numPreviewRows: Long = 1000,
   override val escapeStr: Option[String] = None,
-  override val delimiterStr: Option[String] = None,
+  override val inputDelimiterStr: Option[String] = None,
+  override val outputDelimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
   override val httpUploadHeader: Option[JMap[String, String]] = None)
@@ -108,7 +112,7 @@ object ExecuteRRequest {
 
   def unapply(req: ExecuteRRequest) =
     Some(req.uuid, req.rScript, req.returnNames, req.numPreviewRows,
-      req.escapeStr, req.delimiterStr, req.quoteStr,
+      req.escapeStr, req.inputDelimiterStr, req.outputDelimiterStr, req.quoteStr,
       req.httpUploadUrl, req.httpUploadHeader
     )
 }
@@ -120,10 +124,12 @@ object ExecuteRRequest {
  * @param returnNames
  * @param numPreviewRows
  * @param escapeStr
- * @param delimiterStr
+ * @param inputDelimiterStr
+ * @param outputDelimiterStr
  * @param quoteStr
  * @param httpUploadUrl
  * @param httpUploadHeader
+ * @param columnNames
  */
 case class HadoopExecuteRRequest(
   override val uuid: String,
@@ -131,14 +137,15 @@ case class HadoopExecuteRRequest(
   override val returnNames: Some[ReturnNames],
   override val numPreviewRows: Long = 1000,
   override val escapeStr: Option[String] = None,
-  override val delimiterStr: Option[String] = None,
+  override val inputDelimiterStr: Option[String] = None,
+  override val outputDelimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
   override val httpUploadHeader: Option[JMap[String, String]] = None,
   val columnNames: Option[JList[String]] = None)
     extends ExecuteRRequest(
-      uuid, rScript, returnNames, numPreviewRows, escapeStr,
-      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+      uuid, rScript, returnNames, numPreviewRows, escapeStr, inputDelimiterStr,
+      outputDelimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
     )
 
 /**
@@ -148,10 +155,13 @@ case class HadoopExecuteRRequest(
  * @param returnNames
  * @param numPreviewRows
  * @param escapeStr
- * @param delimiterStr
+ * @param inputDelimiterStr
+ * @param outputDelimiterStr
  * @param quoteStr
  * @param httpUploadUrl
  * @param httpUploadHeader
+ * @param schemaName
+ * @param tableName
  */
 case class DBExecuteRRequest(
   override val uuid: String,
@@ -159,15 +169,16 @@ case class DBExecuteRRequest(
   override val returnNames: Some[ReturnNames],
   override val numPreviewRows: Long = 1000,
   override val escapeStr: Option[String] = None,
-  override val delimiterStr: Option[String] = None,
+  override val inputDelimiterStr: Option[String] = None,
+  override val outputDelimiterStr: Option[String] = None,
   override val quoteStr: Option[String] = None,
   override val httpUploadUrl: Option[String] = None,
   override val httpUploadHeader: Option[JMap[String, String]] = None,
   val schemaName: Option[String],
   val tableName: Option[String])
     extends ExecuteRRequest(
-      uuid, rScript, returnNames, numPreviewRows, escapeStr,
-      delimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+      uuid, rScript, returnNames, numPreviewRows, escapeStr, inputDelimiterStr,
+      outputDelimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
     )
 
 /**

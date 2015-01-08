@@ -36,6 +36,7 @@ import org.apache.http.entity.mime.content.{ FileBody, StringBody }
 import org.apache.http.impl.client.{ CloseableHttpClient, HttpClients, HttpClientBuilder, LaxRedirectStrategy }
 import org.rosuda.REngine.REXP
 import org.rosuda.REngine.Rserve.RConnection
+import resource._
 import RServeMain.autoDeleteTempFiles
 import scala.collection.mutable.Map
 import scala.collection.JavaConversions._
@@ -192,8 +193,28 @@ class RServeActor extends Actor {
       sender ! SyntaxCheckOK(uuid)
     }
 
+    /*
+      case class HadoopExecuteRRequest(
+  override val uuid: String,
+  override val rScript: String,
+  override val returnNames: Some[ReturnNames],
+  override val numPreviewRows: Long = 1000,
+  override val escapeStr: Option[String] = None,
+  override val inputDelimiterStr: Option[String] = None,
+  override val outputDelimiterStr: Option[String] = None,
+  override val quoteStr: Option[String] = None,
+  override val httpUploadUrl: Option[String] = None,
+  override val httpUploadHeader: Option[JMap[String, String]] = None,
+  val columnNames: Option[JList[String]] = None)
+    extends ExecuteRRequest(
+      uuid, rScript, returnNames, numPreviewRows, escapeStr, inputDelimiterStr,
+      outputDelimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
+    )
+       */
+
     case HadoopExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
-      Some(delimiterStr), Some(quoteStr), httpUploadUrl, httpUploadHeader, columnNames
+      Some(inputDelimiterStr), Some(outputDelimiterStr), Some(quoteStr),
+      httpUploadUrl, httpUploadHeader, columnNames
 
       ) => {
 
@@ -204,7 +225,7 @@ class RServeActor extends Actor {
       try {
 
         rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows,
-          escapeStr, delimiterStr, quoteStr, columnNames
+          escapeStr, inputDelimiterStr, outputDelimiterStr, quoteStr, columnNames
         )
         hadoopRestUpload(httpUploadUrl, httpUploadHeader, uuid)
 
@@ -223,7 +244,9 @@ class RServeActor extends Actor {
     }
 
     case DBExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
-      Some(delimiterStr), Some(quoteStr), httpUploadUrl, httpUploadHeader, schemaName, tableName
+      Some(inputDelimiterStr), Some(outputDelimiterStr), Some(quoteStr), httpUploadUrl,
+      httpUploadHeader, schemaName, tableName
+
       ) => {
 
       log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
@@ -232,10 +255,11 @@ class RServeActor extends Actor {
 
       try {
 
-        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr, delimiterStr, quoteStr, None)
+        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr,
+          inputDelimiterStr, outputDelimiterStr, quoteStr, None)
 
         dbRestUpload(
-          httpUploadUrl, httpUploadHeader, uuid, delimiterStr, quoteStr, escapeStr,
+          httpUploadUrl, httpUploadHeader, uuid, outputDelimiterStr, quoteStr, escapeStr,
           schemaName, tableName
         )
 
@@ -276,22 +300,6 @@ class RServeActor extends Actor {
 
   }
 
-  /*
-        // configure the SSLContext with a TrustManager
-
-        URL url = new URL("https://mms.nw.ru");
-        HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-        conn.setHostnameVerifier(new HostnameVerifier() {
-            @Override
-            public boolean verify(String arg0, SSLSession arg1) {
-                return true;
-            }
-        });
-        System.out.println(conn.getResponseCode());
-        conn.disconnect();
-    }
- */
-
   // client will pass in the header info, depending on whether it's DB or Hadoop
   // mutable map is necessary due to implicit conversion from java.util.Map
   private def restDownload(url: Option[String], header: Option[JMap[String, String]], uuid: String): Unit = {
@@ -318,9 +326,6 @@ class RServeActor extends Actor {
           .setRedirectStrategy(new LaxPostRedirectStrategy()) // LaxRedirectStrategy
           .build()
 
-        //        client = HttpClientBuilder
-        //          .create() //  .setHostnameVerifier(new DefaultHostnameVerifier())
-        //          .build()
         fos = new FileOutputStream(new File(localPath))
 
         get = new HttpGet(url.get) {
@@ -643,18 +648,29 @@ class RServeActor extends Actor {
     consoleOutputVar: String,
     inputPath: String,
     outputPath: String,
-    delimiterStr: String,
+    inputDelimiterStr: String,
+    outputDelimiterStr: String,
     previewNumRows: Long,
     columnNames: Option[JList[String]]): String = {
 
     def assignColumnNames(objName: String, l: JList[String]) = l.mkString(s"""names($objName) <- c('""", "', '", "')")
+
+    /* In fread, it should be as.data.frame(fread(input='$inputPath', sep='$delimiterStr')).
+       However, the problem is that fread fails if the delimiter isn't specified as auto or '\n'
+       and there is only one column, i.e. the delimiter doesn't exist because the input file
+       has a single column. So, I'm leaving this as auto for now. The Scala code could handle the distinction
+       between the actual delimieteStr and '\n' for a single column, but that would then require handling
+       of the escaping and quoting correctly to count the number of columns. Alternatively, the
+       RAssign case class could provide the input column count, and if it's
+       equal to 1, the separator could be set to 1.
+      */
 
     val enrichedScript = s"""
             $consoleOutputVar <- capture.output({
 
             library(data.table);
 
-            ${if (hasInput(rawScript)) s"alpine_input <- as.data.frame(fread(input='$inputPath', sep='$delimiterStr'));" else ""}
+            ${if (hasInput(rawScript)) s"alpine_input <- as.data.frame(fread(input='$inputPath', sep='$inputDelimiterStr'));" else ""}
 
             ${if (columnNames != None) assignColumnNames("alpine_input", columnNames.get) else ""}
 
@@ -667,7 +683,7 @@ class RServeActor extends Actor {
                   if (class(alpine_output) != 'data.frame') {
                     stop(sprintf('Class of alpine_output is not data.frame but %s. Did you try to return something other than a data frame or did R coerce the type?', class(alpine_output)))
                   }
-                  write.table(x = alpine_output, file='$outputPath', sep='$delimiterStr', append=FALSE, quote=FALSE, row.names=FALSE)
+                  write.table(x = alpine_output, file='$outputPath', sep='$outputDelimiterStr', append=FALSE, quote=FALSE, row.names=FALSE)
                   # preview this many rows in UI
                   # need to handle a degenerate case of a single-column data frame, which will be type coerced by R
                   alpineOutputColNames <- names(alpine_output)
@@ -694,15 +710,15 @@ class RServeActor extends Actor {
   private def hasOutput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_output", "#")
 
   private def processRequest(uuid: String, rScript: String, returnNames: ReturnNames,
-    numPreviewRows: Long, escapeStr: String, delimiterStr: String, quoteStr: String,
-    columnNames: Option[JList[String]]): RResponse = {
+    numPreviewRows: Long, escapeStr: String, inputDelimiterStr: String, outputDelimiterStr: String,
+    quoteStr: String, columnNames: Option[JList[String]]): RResponse = {
 
     var rConsoleOutput: Array[String] = null
     var dataPreview: Option[JMap[String, Object]] = None
 
     // execute R script
     eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid),
-      uploadLocalPath(uuid), delimiterStr, numPreviewRows, columnNames))
+      uploadLocalPath(uuid), inputDelimiterStr, outputDelimiterStr, numPreviewRows, columnNames))
 
     rConsoleOutput = eval(returnNames.rConsoleOutput).asInstanceOf[Array[String]]
 
