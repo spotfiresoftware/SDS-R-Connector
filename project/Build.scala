@@ -12,7 +12,7 @@ object AlpineRConnectorBuild extends Build {
       ms filter { case (file, toPath) => !toPath.endsWith("application.conf") }
 
   lazy val sharedSettings = Defaults.defaultSettings ++ scalariformSettings ++ assemblySettings  ++ Seq(  
-    version := "0.6",
+    version := "0.7",
     organization := "com.alpine",
     scalaVersion := "2.10.3",
     fork := true,
