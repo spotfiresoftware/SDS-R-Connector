@@ -3,6 +3,16 @@
 
 .DS_Store
 .RData
+alpine-r-connector.jar
+nohup.out
+r_log.txt
+scripts/alpine-r-connector.jar
+scripts/java-r-server.pid
+scripts/start_r_component.Rout
+
+
+.idea/*
+*.iml
 
 .cache/
 .history/
