@@ -5,6 +5,7 @@
 .RData
 alpine-r-connector.jar
 nohup.out
+*.Rout
 r_log.txt
 scripts/alpine-r-connector.jar
 scripts/java-r-server.pid

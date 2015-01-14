@@ -15,7 +15,7 @@ fi
 # Remove old log
 rm -rf start_r_component.Rout
 
-echo "Installing Rserve library into R's repository (if necessary) and starting the R-side Rserve component of the service."
+echo "Starting the R-side Rserve component of the service."
 echo "The log of the R-side component will can be found in start_R_component.Rout"
 # Install the Rserve tar ball, ignore installation if it is already installed.
 # Start Rserve on the R side, ignore if it's already running.
@@ -24,7 +24,7 @@ R CMD BATCH start_r_component.R
 # If there are problems running the R script, print error to screen
 if [ $? -ne 0 ]; then
 cat start_r_component.Rout
-echo "Error installing Rserve and/or starting up the R-side component."
+echo "Error starting up the R-side component. Did you prepare the service by running scripts/prepare_r_service.sh ?"
 exit 1
 fi
 
