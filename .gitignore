@@ -10,6 +10,7 @@ r_log.txt
 scripts/alpine-r-connector.jar
 scripts/java-r-server.pid
 scripts/start_r_component.Rout
+alpine-r-connector.tar
 
 
 .idea/*
