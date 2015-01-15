@@ -8,5 +8,5 @@ echo ""
 
 # kill Java process
 echo "Killing the Scala web server"
-kill -9 `cat java-r-server.pid`
+cat java-r-server.pid | xargs kill -9
 rm -f java-r-server.pid

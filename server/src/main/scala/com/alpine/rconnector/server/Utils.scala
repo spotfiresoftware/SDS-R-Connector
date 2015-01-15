@@ -4,6 +4,7 @@ import java.io.File
 import java.net.{ BindException, ServerSocket }
 
 import scala.util.{ Failure, Success, Try }
+import org.apache.http.HttpStatus
 
 /**
  * @author Marek Kolodziej
@@ -126,6 +127,22 @@ object Utils {
 
       commentIdx < 0 && matcherIdx >= 0 || commentIdx >= 0 && matcherIdx >= 0 && commentIdx > matcherIdx
     })
+  }
+
+  def alpineUpDownLoadErrMsg(msgPrefix: String)(statusCode: Int, responseContent: String): String = {
+
+    val reason = statusCode match {
+      case HttpStatus.SC_INTERNAL_SERVER_ERROR => {
+        responseContent.split("\n")
+          .flatMap(x => Try(x.split("The server encountered an internal error ")(1)).toOption)
+          .map(_.trim)
+          .filter(_.size > 0)
+          .mkString("|")
+      }
+      case _ => (s: String) => s
+    }
+
+    s"$msgPrefix, status code $statusCode : $reason"
   }
 
 }

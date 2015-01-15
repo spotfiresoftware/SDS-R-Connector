@@ -341,10 +341,12 @@ class RServeActor extends Actor {
 
         if (statusCode != HttpStatus.SC_OK) {
 
-          val excMsg = s"REST download of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}. Check R server log for more details."
+          val responseContent = IOUtils.toString(response.getEntity.getContent, "UTF-8")
+          log.error(responseContent)
+
+          val excMsg = Utils.alpineUpDownLoadErrMsg("REST download of R dataset from Alpine to R server failed")(statusCode, responseContent)
           log.error(excMsg)
-          // This will report the exception in the log
-          log.error(IOUtils.toString(response.getEntity.getContent, "UTF-8"))
+
           throw new RuntimeException(excMsg)
         }
 
@@ -444,10 +446,12 @@ class RServeActor extends Actor {
 
         if (statusCode != HttpStatus.SC_OK) {
 
-          val excMsg = s"REST upload of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}. Check R server log for more details."
+          val responseContent = IOUtils.toString(response.getEntity.getContent, "UTF-8")
+          log.error(responseContent)
+
+          val excMsg = Utils.alpineUpDownLoadErrMsg("REST upload of dataset from Alpine to R server failed")(statusCode, responseContent)
           log.error(excMsg)
-          // This will report the exception in the log
-          log.error(IOUtils.toString(response.getEntity.getContent, "UTF-8"))
+
           throw new RuntimeException(excMsg)
         }
 
@@ -591,11 +595,13 @@ class RServeActor extends Actor {
 
         if (statusCode != HttpStatus.SC_OK) {
 
-          val excMsg = s"REST upload of R dataset from Alpine to R server failed with status code $statusCode. Message: ${statusLine.getReasonPhrase}. Check R server log for more details."
-          log.error(excMsg)
-          // This will report the exception in the log
-          log.error(IOUtils.toString(response.getEntity.getContent, "UTF-8"))
-          throw new RuntimeException(excMsg)
+          val responseContent = IOUtils.toString(response.getEntity.getContent, "UTF-8")
+          log.error(responseContent)
+
+          val errMsg = Utils.alpineUpDownLoadErrMsg("REST upload from R server to Alpine failed")(statusCode, responseContent)
+          log.error(errMsg)
+
+          throw new RuntimeException(errMsg)
         }
 
         log.info(s"File $localPath uploaded successfully")
