@@ -112,21 +112,7 @@ class RServeActor extends Actor {
   // remove all temporary data from R workspace
   protected[this] def clearWorkspace() = conn.eval("rm(list = ls())")
 
-  private def eval(s: String): java.lang.Object = {
-    val enrichedScript =
-
-      s"""try({
-                         $s
-                       },
-                       silent=TRUE)""".stripMargin
-    log.info(s"\nEvaluating $enrichedScript\n")
-    val res: REXP = conn.parseAndEval(enrichedScript) // eval
-    if (res.inherits("try-error")) {
-      log.info(s"Error in script:\n$s")
-      throw new RuntimeException(res.asString)
-    }
-    res.asNativeJavaObject
-  }
+  private def eval: String => java.lang.Object = RExecution.eval(conn, log)
 
   def receive: Receive = {
 
@@ -490,45 +476,6 @@ class RServeActor extends Actor {
     }
   }
 
-  private def getDBUploadMeta(dfName: String = "alpine_output",
-    schemaName: String, tableName: String,
-    delimiter: String, quote: String, escape: String,
-    limitNum: Long = -1, includeHeader: Boolean): String = {
-
-    def getRTypes(dfName: String = "alpine_output"): JMap[String, Array[String]] = {
-      eval(s"as.data.frame(lapply($dfName, class), stringsAsFactors = FALSE)")
-        .asInstanceOf[JMap[String, Array[String]]]
-
-    }
-
-    def generateColElem(kv: (String, Array[String]), included: Boolean = true, allowEmpty: Boolean = true) =
-
-      kv match {
-
-        case (k: String, v: Array[String]) => {
-
-          s"""{"columnName":"$k","columnType":"${
-            v(0).toLowerCase match {
-
-              case "integer" => "INTEGER"
-              case "numeric" => "DOUBLE"
-              case "logical" => "BOOLEAN"
-              case "character" => "VARCHAR"
-              case "factor" => "VARCHAR"
-              case _ => "VARCHAR"
-            }
-          }","isInclude":"$included","allowEmpty":"$allowEmpty"}""".stripMargin
-        }
-      }
-
-    val getRT = getRTypes(dfName)
-    val types = getRT.map(kv => generateColElem(kv)).mkString(",")
-
-    println(s"\n\ntypes\n\n$types\n\n")
-
-    s"""{"schemaName":"$schemaName","tableName":"$tableName","delimiter":"${escapeJava(delimiter)}","quote":"${escapeJava(quote)}","escape":"${escapeJava(escape)}","limitNum":$limitNum,"includeHeader":$includeHeader,"structure":[$types]}""".stripMargin
-  }
-
   private def dbRestUpload(url: Option[String], header: Option[JMap[String, String]], uuid: String,
     delimiterStr: String, quoteStr: String, escapeStr: String,
     schemaName: Option[String], tableName: Option[String]): Unit = {
@@ -570,7 +517,7 @@ class RServeActor extends Actor {
 
         }
 
-        val metadata = getDBUploadMeta(
+        val metadata = AlpineFileTransfer.getDBUploadMeta(eval)(
           dfName = "alpine_output",
           schemaName = schemaName.get,
           tableName = tableName.get,
