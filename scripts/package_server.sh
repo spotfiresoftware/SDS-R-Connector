@@ -20,7 +20,8 @@ cp scripts/prepare_services.sh alpine-r-connector/
 cp scripts/LICENSE alpine-r-connector/
 cp scripts/*.tar.gz alpine-r-connector/
 cp scripts/*.R alpine-r-connector/
-cp scripts/application.conf alpine-r-connector
+cp scripts/application.conf alpine-r-connector/
+cp server/target/scala-2.10/alpine-r-connector.jar alpine-r-connector/ 
 
 # make a simple README
 README="Official Alpine R Server, version 5.1 Shastina.
