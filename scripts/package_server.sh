@@ -42,7 +42,7 @@ After this step, the R server (both the R process and the webserver) can be star
     ./start_services.sh
     ./stop_services.sh
 
-The R server has several deployment configuration options. These are specified in the application.conf file. For more information about deployment and other related topics, consult the [README](https://github.com/alpinedatalabs/alpine-r/blob/master/README.md) in the alpine-r project.
+The R server has several deployment configuration options. These are specified in the application.conf file. For more information about deployment and other related topics, consult the [README](https://github.com/alpinedatalabs/alpine-r/blob/master/README.md) in the alpine-r project."
 echo $README > ./alpine-r-connector/README.md
 
 # create archive and clean up dir
