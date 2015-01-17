@@ -26,20 +26,23 @@ cp server/target/scala-2.10/alpine-r-connector.jar alpine-r-connector/
 # make a simple README
 README="Official Alpine R Server, version 5.1 Shastina.
 
-Unpackage with
 
-    tar xf alpine-r-connectorfigu
+As the user you want to run the R server, download and then unpackage with
+
+    tar xf alpine-r-connector
 
 For first time installation, run
 
     ./prepare_services.sh
+
+Note that this script must be run with the same user & permissions that installed R. On most systems, this is root. 
 
 After this step, the R server (both the R process and the webserver) can be started and stopped by executing the following scripts
 
     ./start_services.sh
     ./stop_services.sh
 
-The R server has several deployment configuration options. These are specified in the application.conf file. For more information about deployment and other related topics, consult the [README](https://github.com/alpinedatalabs/alpine-r/blob/master/README.md) in the alpine-r project."
+The R server has several deployment configuration options. These are specified in the application.conf file. For more information about deployment and other related topics, consult the [README](https://github.com/alpinedatalabs/alpine-r/blob/master/README.md) in the alpine-r project.
 echo $README > ./alpine-r-connector/README.md
 
 # create archive and clean up dir
