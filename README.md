@@ -1,5 +1,4 @@
-[![Build Status](https://travis-ci.org/alpinedatalabs/alpine-r.svg?branch=master)](https://travis-ci.org/alpinedatalabs/alpine-r) [![Coverage Status](https://coveralls.io/repos/alpinedatalabs/alpine-r/badge.svg)](https://coveralls.io/r/alpinedatalabs/alpine-r)
-
+[![Build Status](https://travis-ci.org/alpinedatalabs/alpine-r.svg?branch=master)](https://travis-ci.org/alpinedatalabs/alpine-r) 
 
 Alpine R Connector
 ==================

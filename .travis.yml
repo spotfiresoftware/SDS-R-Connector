@@ -1,4 +1,4 @@
 language: scala
 scala:
   - 2.10.4
-script: ./.travis_build.sh
+script: "sbt server/assembly"
