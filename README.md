@@ -5,6 +5,16 @@ Alpine R Connector
 
 This open-source project provides the R server infrastructure for Alpine Data Labs' backend. You could potentially use it for other kinds of JVM/R integration - however, see the license information below.
 
+Quick Start
+-----------
+
+If you're familiar with the project, but forgot how to get everything up and running, these commands are for you!
+
+(1) Create a new build by executing: ./sbt assembly
+(2) cd to ./scripts
+(3) make a symlink to the assembled Alpine R server: ln -s ../server/target/scala-2.10/alpine-r-connector.jar
+(4) start the server by executing: ./start_services.sh
+
 Licensing
 ---------
 
