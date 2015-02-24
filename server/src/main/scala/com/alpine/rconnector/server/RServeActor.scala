@@ -66,25 +66,29 @@ class RServeActor extends Actor {
   // trust self-signed SSL certificates
   val trustStore = KeyStore.getInstance(KeyStore.getDefaultType)
   val sslCtx = SSLContexts.custom().loadTrustMaterial(trustStore, new TrustSelfSignedStrategy()).build()
-  val sslConnFactory = new SSLConnectionSocketFactory(sslCtx,
-    Array("SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2"), null,
+  val sslConnFactory = new SSLConnectionSocketFactory(
+    sslCtx,
+    Array("SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2"),
+    null,
     SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
 
-  /* Note: ALLOW_ALL_HOSTNAME_VERIFIER doesn't check domain correctness, e.g. it will accept
-     localhost/127.0.0.1 instead of alpineqa3.alpinenow.local/10.0.0.204
-     Set to BROWSER_COMPATIBLE_HOSTNAME_VERIFIER and use correctly issued
-     SSL certificates if this is a problem.
+  /*
+    *** Note ***
+    ALLOW_ALL_HOSTNAME_VERIFIER doesn't check domain correctness, e.g. it will accept
+    localhost/127.0.0.1 instead of alpineqa3.alpinenow.local/10.0.0.204
+    Set to BROWSER_COMPATIBLE_HOSTNAME_VERIFIER and use correctly issued
+    SSL certificates if this is a problem.
    */
 
   def updateConnAndPid() = {
-
     conn = new RConnection()
     pid = conn.eval("Sys.getpid()").asNativeJavaObject.asInstanceOf[Array[Int]](0)
     log.info(s"New R PID is $pid")
     context.parent ! PId(pid)
   }
 
-  override def preStart(): Unit = updateConnAndPid()
+  override def preStart(): Unit =
+    updateConnAndPid()
 
   logActorStart(this)
 
@@ -93,7 +97,8 @@ class RServeActor extends Actor {
     s"kill -9 $pid" !
   }
 
-  override def postStop(): Unit = killRProcess()
+  override def postStop(): Unit =
+    killRProcess()
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // send message about exception to the client (e.g. for UI reporting)
@@ -110,7 +115,8 @@ class RServeActor extends Actor {
   }
 
   // remove all temporary data from R workspace
-  protected[this] def clearWorkspace() = conn.eval("rm(list = ls())")
+  protected[this] def clearWorkspace() =
+    conn.eval("rm(list = ls())")
 
   private def eval: String => java.lang.Object = RExecution.eval(conn, log)
 
@@ -121,22 +127,20 @@ class RServeActor extends Actor {
       log.info(s"Received RAssign message")
 
       if (httpDownloadUrl != None && httpDownloadHeader != None) {
-
         log.info("Download URL and header are present - performing REST download")
         restDownload(httpDownloadUrl, httpDownloadHeader, uuid)
       }
 
       log.info("Assigning objects (if any) to R workspace")
-      objects.foreach { elem =>
-
-        elem match {
-
-          case (x, y: String) => conn.assign(x, y)
-          case (x, y: Array[Byte]) => conn.assign(x, y)
-          case (x, y) => throw new IllegalStateException(
+      objects.foreach {
+        case (x, y: String) =>
+          conn.assign(x, y)
+        case (x, y: Array[Byte]) =>
+          conn.assign(x, y)
+        case (x, y) =>
+          throw new IllegalStateException(
             s"Unsupported type of value $x Expected either String or Array[Byte] but got ${y.getClass.getName}"
           )
-        }
       }
 
       log.info("Acking assignment to client")
@@ -144,34 +148,33 @@ class RServeActor extends Actor {
     }
 
     case SyntaxCheckRequest(uuid, rScript) => {
-
       log.info("Evaluating syntax check request")
       conn.assign("rawScript", rScript)
 
       try {
-
         eval(parseBoilerplate)
-
       } catch {
 
-        case e: Exception =>
-          {
-            deleteTempFiles(uuid)
-            val msg = e.getMessage
-            val errorIn = "Error in"
-            if (msg.contains(parseBoilerplate)) {
-              val noBoilerplate = msg.replace(parseBoilerplate, "")
-              val noErrorIn =
-                if (noBoilerplate.startsWith(errorIn)) noBoilerplate.replaceFirst(errorIn, "") else noBoilerplate
-              val leadingRegex = "[^a-zA-Z]+text[^a-zA-Z]+".r
-              val finalStr = leadingRegex.replaceFirstIn(noErrorIn, "")
-              throw new RuntimeException(finalStr)
+        case e: Exception => {
+          deleteTempFiles(uuid)
 
-            } else {
+          val msg = e.getMessage
+          val errorIn = "Error in"
 
-              throw e
-            }
+          if (msg.contains(parseBoilerplate)) {
+            val noBoilerplate = msg.replace(parseBoilerplate, "")
+            val noErrorIn =
+              if (noBoilerplate.startsWith(errorIn)) noBoilerplate.replaceFirst(errorIn, "")
+              else noBoilerplate
+            val leadingRegex = "[^a-zA-Z]+text[^a-zA-Z]+".r
+            val finalStr = leadingRegex.replaceFirstIn(noErrorIn, "")
+
+            throw new RuntimeException(finalStr)
+
+          } else {
+            throw e
           }
+        }
       }
 
       log.info("Evaluation successful. Sending response back to Alpine.")
@@ -179,92 +182,104 @@ class RServeActor extends Actor {
       sender ! SyntaxCheckOK(uuid)
     }
 
-    /*
-      case class HadoopExecuteRRequest(
-  override val uuid: String,
-  override val rScript: String,
-  override val returnNames: Some[ReturnNames],
-  override val numPreviewRows: Long = 1000,
-  override val escapeStr: Option[String] = None,
-  override val inputDelimiterStr: Option[String] = None,
-  override val outputDelimiterStr: Option[String] = None,
-  override val quoteStr: Option[String] = None,
-  override val httpUploadUrl: Option[String] = None,
-  override val httpUploadHeader: Option[JMap[String, String]] = None,
-  val columnNames: Option[JList[String]] = None)
-    extends ExecuteRRequest(
-      uuid, rScript, returnNames, numPreviewRows, escapeStr, inputDelimiterStr,
-      outputDelimiterStr, quoteStr, httpUploadUrl, httpUploadHeader
-    )
-       */
-
-    case HadoopExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
-      Some(inputDelimiterStr), Some(outputDelimiterStr), Some(quoteStr),
-      httpUploadUrl, httpUploadHeader, columnNames
-
-      ) => {
+    case HadoopExecuteRRequest(
+      uuid,
+      rScript,
+      Some(returnNames),
+      numPreviewRows,
+      Some(escapeStr),
+      Some(inputDelimiterStr),
+      Some(outputDelimiterStr),
+      Some(quoteStr),
+      httpUploadUrl,
+      httpUploadHeader,
+      columnNames) => {
 
       log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
 
-      var rResponse: RResponse = null
+      val rResponse: RResponse = Try({
 
-      try {
+        val r = processRequest(
+          uuid,
+          rScript,
+          returnNames,
+          numPreviewRows,
+          escapeStr,
+          inputDelimiterStr,
+          outputDelimiterStr,
+          quoteStr,
+          columnNames)
 
-        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows,
-          escapeStr, inputDelimiterStr, outputDelimiterStr, quoteStr, columnNames
-        )
         hadoopRestUpload(httpUploadUrl, httpUploadHeader, uuid)
 
-      } finally {
+        r
+      }) match {
+        case Success(r) => r
+        case Failure(_) => null
+      }
 
-        if (autoDeleteTempFiles) {
-
-          deleteTempFiles(uuid)
-        }
-
+      if (autoDeleteTempFiles) {
+        deleteTempFiles(uuid)
       }
 
       log.info(s"Sending R response to client")
       sender ! rResponse
-
     }
 
-    case DBExecuteRRequest(uuid, rScript, Some(returnNames), numPreviewRows, Some(escapeStr),
-      Some(inputDelimiterStr), Some(outputDelimiterStr), Some(quoteStr), httpUploadUrl,
-      httpUploadHeader, schemaName, tableName
-
-      ) => {
+    case DBExecuteRRequest(
+      uuid,
+      rScript,
+      Some(returnNames),
+      numPreviewRows,
+      Some(escapeStr),
+      Some(inputDelimiterStr),
+      Some(outputDelimiterStr),
+      Some(quoteStr),
+      httpUploadUrl,
+      httpUploadHeader,
+      schemaName,
+      tableName) => {
 
       log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
 
-      var rResponse: RResponse = null
+      val rResponse: RResponse = Try({
 
-      try {
-
-        rResponse = processRequest(uuid, rScript, returnNames, numPreviewRows, escapeStr,
-          inputDelimiterStr, outputDelimiterStr, quoteStr, None)
+        val r = processRequest(
+          uuid,
+          rScript,
+          returnNames,
+          numPreviewRows,
+          escapeStr,
+          inputDelimiterStr,
+          outputDelimiterStr,
+          quoteStr,
+          None)
 
         dbRestUpload(
-          httpUploadUrl, httpUploadHeader, uuid, outputDelimiterStr, quoteStr, escapeStr,
-          schemaName, tableName
-        )
+          httpUploadUrl,
+          httpUploadHeader,
+          uuid,
+          outputDelimiterStr,
+          quoteStr,
+          escapeStr,
+          schemaName,
+          tableName)
 
-      } finally {
+        r
+      }) match {
+        case Success(r) => r
+        case Failure(_) => null
+      }
 
-        if (autoDeleteTempFiles) {
-
-          deleteTempFiles(uuid)
-        }
-
+      if (autoDeleteTempFiles) {
+        deleteTempFiles(uuid)
       }
 
       log.info(s"Sending R response to client")
       sender ! rResponse
-
     }
 
     case FinishRSession(uuid) => {
-
       log.info(s"Finishing R session for UUID $uuid")
       killRProcess()
       updateConnAndPid()
@@ -278,7 +293,6 @@ class RServeActor extends Actor {
     }
 
     case other => {
-
       val errMsg = s"Unexpected message of type ${other.getClass.getName} from $sender"
       log.error(errMsg)
       throw new AkkaException(errMsg)
@@ -315,13 +329,11 @@ class RServeActor extends Actor {
         fos = new FileOutputStream(new File(localPath))
 
         get = new HttpGet(url.get) {
-
           setProtocolVersion(HttpVersion.HTTP_1_1) // ensure chunking
           header.get.foreach { case (k, v) => setHeader(k, v) }
         }
 
         val response = client.execute(get)
-
         val statusLine = response.getStatusLine
         val statusCode = statusLine.getStatusCode
 
@@ -330,7 +342,8 @@ class RServeActor extends Actor {
           val responseContent = IOUtils.toString(response.getEntity.getContent, "UTF-8")
           log.error(responseContent)
 
-          val excMsg = Utils.alpineUpDownLoadErrMsg("REST download of R dataset from Alpine to R server failed")(statusCode, responseContent)
+          val excMsg = Utils.alpineUpDownLoadErrMsg(
+            "REST download of R dataset from Alpine to R server failed")(statusCode, responseContent)
           log.error(excMsg)
 
           throw new RuntimeException(excMsg)
@@ -343,20 +356,18 @@ class RServeActor extends Actor {
       } catch {
 
         case e: ConnectTimeoutException => {
-
           if (autoDeleteTempFiles) {
-
             deleteDownloadTempFile(uuid)
           }
+
           throw new RuntimeException(e.getMessage)
-
         }
+
         case e: Exception => {
-
           if (autoDeleteTempFiles) {
-
             deleteDownloadTempFile(uuid)
           }
+
           throw new RuntimeException(e.getMessage)
         }
 
@@ -364,22 +375,17 @@ class RServeActor extends Actor {
 
         if (client != null) {
           client.close()
-
         }
 
         if (fos != null) {
-
           fos.close()
         }
 
         if (get != null) {
-
           get.releaseConnection()
         }
-
       }
     }
-
   }
 
   // mutable map is necessary due to implicit conversion from java.util.Map
@@ -407,14 +413,10 @@ class RServeActor extends Actor {
           .setRedirectStrategy(new LaxPostRedirectStrategy()) // LaxRedirectStrategy
           .build()
 
-        //        client = HttpClientBuilder.create().build()
-
         println(s"\n\nHTTP POST to URL ${url.get}\n\n")
 
         post = new HttpPost(url.get) {
-
           setProtocolVersion(HttpVersion.HTTP_1_1) // ensure chunking
-          // setEntity(new FileEntity(new File(localPath), ContentType.MULTIPART_FORM_DATA))
           header.get.foreach { case (k, v) => setHeader(k, v) }
         }
 
@@ -431,11 +433,12 @@ class RServeActor extends Actor {
         val statusCode = statusLine.getStatusCode
 
         if (statusCode != HttpStatus.SC_OK) {
-
           val responseContent = IOUtils.toString(response.getEntity.getContent, "UTF-8")
           log.error(responseContent)
 
-          val excMsg = Utils.alpineUpDownLoadErrMsg("REST upload of dataset from Alpine to R server failed")(statusCode, responseContent)
+          val excMsg = Utils.alpineUpDownLoadErrMsg(
+            "REST upload of dataset from Alpine to R server failed")(statusCode, responseContent)
+
           log.error(excMsg)
 
           throw new RuntimeException(excMsg)
@@ -446,30 +449,25 @@ class RServeActor extends Actor {
       } catch {
 
         case e: ConnectTimeoutException => {
-
           deleteUploadTempFile(uuid)
           throw new RuntimeException(e.getMessage)
-
         }
 
         case e: Exception => {
-
           if (autoDeleteTempFiles) {
-
             deleteTempFiles(uuid)
           }
+
           throw new RuntimeException(e)
         }
 
       } finally {
 
         if (client != null) {
-
           client.close()
         }
 
         if (post != null) {
-
           post.releaseConnection()
         }
       }
@@ -606,7 +604,8 @@ class RServeActor extends Actor {
     previewNumRows: Long,
     columnNames: Option[JList[String]]): String = {
 
-    def assignColumnNames(objName: String, l: JList[String]) = l.mkString(s"""names($objName) <- c('""", "', '", "')")
+    def assignColumnNames(objName: String, l: JList[String]) =
+      l.mkString(s"""names($objName) <- c('""", "', '", "')")
 
     /* In fread, it should be as.data.frame(fread(input='$inputPath', sep='$delimiterStr')).
        However, the problem is that fread fails if the delimiter isn't specified as auto or '\n'
@@ -654,33 +653,52 @@ class RServeActor extends Actor {
     enrichedScript
   }
 
-  private def downloadLocalPath(uuid: String) = s"${RServeMain.localTempDir}/$uuid.$downloadExtension"
+  private def downloadLocalPath(uuid: String): String =
+    s"${RServeMain.localTempDir}/$uuid.$downloadExtension"
 
-  private def uploadLocalPath(uuid: String) = s"${RServeMain.localTempDir}/$uuid.$uploadExtension"
+  private def uploadLocalPath(uuid: String): String =
+    s"${RServeMain.localTempDir}/$uuid.$uploadExtension"
 
-  private def hasInput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_input", "#")
+  private def hasInput(rScript: String): Boolean =
+    Utils.containsNotInComment(rScript, "alpine_input", "#")
 
-  private def hasOutput(rScript: String) = Utils.containsNotInComment(rScript, "alpine_output", "#")
+  private def hasOutput(rScript: String): Boolean =
+    Utils.containsNotInComment(rScript, "alpine_output", "#")
 
-  private def processRequest(uuid: String, rScript: String, returnNames: ReturnNames,
-    numPreviewRows: Long, escapeStr: String, inputDelimiterStr: String, outputDelimiterStr: String,
-    quoteStr: String, columnNames: Option[JList[String]]): RResponse = {
-
-    var rConsoleOutput: Array[String] = null
-    var dataPreview: Option[JMap[String, Object]] = None
+  private def processRequest(
+    uuid: String,
+    rScript: String,
+    returnNames: ReturnNames,
+    numPreviewRows: Long,
+    escapeStr: String,
+    inputDelimiterStr: String,
+    outputDelimiterStr: String,
+    quoteStr: String,
+    columnNames: Option[JList[String]]): RResponse = {
 
     // execute R script
-    eval(enrichRScript(rScript, returnNames.rConsoleOutput, downloadLocalPath(uuid),
-      uploadLocalPath(uuid), inputDelimiterStr, outputDelimiterStr, numPreviewRows, columnNames))
+    val escript = enrichRScript(
+      rScript,
+      returnNames.rConsoleOutput,
+      downloadLocalPath(uuid),
+      uploadLocalPath(uuid),
+      inputDelimiterStr,
+      outputDelimiterStr,
+      numPreviewRows,
+      columnNames)
 
-    rConsoleOutput = eval(returnNames.rConsoleOutput).asInstanceOf[Array[String]]
+    eval(escript)
 
-    dataPreview = if (hasOutput(rScript))
-      Some(eval(returnNames.outputDataFrame.get).asInstanceOf[JMap[String, Object]])
-    else None
+    val rConsoleOutput = eval(returnNames.rConsoleOutput).asInstanceOf[Array[String]]
+
+    val dataPreview =
+      if (hasOutput(rScript)) {
+        Some(eval(returnNames.outputDataFrame.get).asInstanceOf[JMap[String, Object]])
+      } else {
+        None
+      }
 
     RResponse(rConsoleOutput, dataPreview)
-
   }
 
 }
