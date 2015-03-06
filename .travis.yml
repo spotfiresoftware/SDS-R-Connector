@@ -1,4 +1,5 @@
 language: scala
 scala:
   - 2.10.4
-script: "sbt server/assembly"
+script: "sbt server/assembly test"
+after_script: "sbt coveralls"
