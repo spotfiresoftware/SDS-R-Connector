@@ -38,12 +38,11 @@ object MocksAndFixtures {
 
   val mean = "x = mean(1:10)"
   val x = "x"
-  val arrX = Array(x)
   val fooExp = "rm(list = ls()); foo = 'foo'"
   val meanResult = new REXPDouble(5.5)
   val fooResult = new REXPString("foo")
-  val fooResultMsg = RResponse(Map("foo" -> fooResult.asNativeJavaObject()))
-  val meanResultMsg = RResponse(Map("x" -> meanResult.asNativeJavaObject()))
+  val fooResultMsg = RResponse(Array.empty[String], Some(Map("foo" -> fooResult.asNativeJavaObject())))
+  val meanResultMsg = RResponse(Array.empty[String], Some(Map("x" -> meanResult.asNativeJavaObject())))
   val clearWorkspace = "rm(list = ls())"
   val rExpNull = new REXPNull
   val badRCode = "thisIsBadRCode"
@@ -57,14 +56,15 @@ object MocksAndFixtures {
      but the RServeActor sends an RException _message_ to the calling actor
      upon the RserveException being thrown by R and propagated to Rserve */
   when(rConn eval badRCode) thenThrow classOf[RserveException]
-  when(rConn eval x) thenReturn (meanResult)
-  when(rConn eval "foo") thenReturn (fooResult)
+  when(rConn eval x) thenReturn meanResult
+  when(rConn eval "foo") thenReturn fooResult
 
   // have RServeActor use the mock of the R connection
   class MockRServeActor extends RServeActor {
 
-    override protected val conn = rConn
     def clrWorkspace() = clearWorkspace()
+
+    conn = rConn
   }
 
   val mockRServeActor = TestActorRef(new MockRServeActor())

@@ -62,11 +62,6 @@ sealed class RRequest(
 
 object RRequest {
 
-  /**
-   *
-   * @param req
-   * @return
-   */
   def unapply(req: RRequest) =
     Some(req.uuid, req.rScript, req.returnNames, req.numPreviewRows, req.escapeStr, req.inputDelimiterStr,
       req.outputDelimiterStr, req.quoteStr, req.httpUploadUrl, req.httpUploadHeader)
