@@ -53,13 +53,13 @@ object AlpineRConnectorBuild extends Build {
 
   lazy val akkaSettings = Seq(
   	libraryDependencies ++= {
-      val akkaVer = "2.2.3"
+      val akkaVer = "2.3.4-spark"
       val apacheHttpVer = "4.3.3"
   	  Seq(
-  	    "org.spark-project.akka"     %%    "akka-actor"                    %    s"$akkaVer-shaded-protobuf",  // akkaVertion
-        "org.spark-project.akka"     %%    "akka-remote"                   %    s"$akkaVer-shaded-protobuf",
-        "org.spark-project.akka"     %%    "akka-slf4j"                    %    s"$akkaVer-shaded-protobuf",
-        "org.spark-project.akka"     %%    "akka-testkit"                  %    s"$akkaVer-shaded-protobuf" % "test",
+        "org.spark-project.akka"     %%    "akka-actor"                    %    s"$akkaVer",
+        "org.spark-project.akka"     %%    "akka-remote"                   %    s"$akkaVer",
+        "org.spark-project.akka"     %%    "akka-slf4j"                    %    s"$akkaVer",
+        "org.spark-project.akka"     %%    "akka-testkit"                  %    s"$akkaVer" % "test",
         "org.apache.commons"         %     "commons-lang3"                 %    "3.3.2",
         "org.apache.httpcomponents"  %     "httpclient"                    %    s"$apacheHttpVer",   
         "org.apache.httpcomponents"  %     "httpcore"                      %    s"$apacheHttpVer",   
