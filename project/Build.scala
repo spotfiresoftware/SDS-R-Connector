@@ -53,16 +53,9 @@ object AlpineRConnectorBuild extends Build {
 
   lazy val akkaSettings = Seq(
   	libraryDependencies ++= {
-      //val akkaVer = "2.3.4-spark"
       val akkaVer = "2.3.11"
       val apacheHttpVer = "4.3.3"
   	  Seq(
-      /*
-        "org.spark-project.akka"     %%    "akka-actor"                    %    s"$akkaVer",
-        "org.spark-project.akka"     %%    "akka-remote"                   %    s"$akkaVer",
-        "org.spark-project.akka"     %%    "akka-slf4j"                    %    s"$akkaVer",
-        "org.spark-project.akka"     %%    "akka-testkit"                  %    s"$akkaVer" % "test",
-      */
         "com.typesafe.akka"    %% "akka-actor"       % s"$akkaVer",
         "com.typesafe.akka"    %% "akka-remote"      % s"$akkaVer",
         "com.typesafe.akka"    %% "akka-slf4j"       % s"$akkaVer",
