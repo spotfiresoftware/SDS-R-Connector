@@ -33,7 +33,7 @@ object AlpineFileTransfer {
         s"""{"columnName":"$k","columnType":"${
           v(0).toLowerCase match {
             case "integer" => "INTEGER"
-            case "numeric" => "DOUBLE"
+            case "numeric" => "NUMERIC"
             case "logical" => "BOOLEAN"
             case "character" => "VARCHAR"
             case "factor" => "VARCHAR"
