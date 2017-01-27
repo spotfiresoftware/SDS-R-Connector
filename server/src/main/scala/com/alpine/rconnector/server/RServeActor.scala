@@ -197,7 +197,7 @@ class RServeActor extends Actor {
 
       log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
 
-      val rResponse: RResponse = Try({
+      val rResponse: Message = Try({
 
         val r = processRequest(
           uuid,
@@ -215,7 +215,7 @@ class RServeActor extends Actor {
         r
       }) match {
         case Success(r) => r
-        case Failure(_) => null
+        case Failure(e) => RException(e)
       }
 
       if (autoDeleteTempFiles) {
@@ -242,7 +242,7 @@ class RServeActor extends Actor {
 
       log.info("Received HadoopExecuteRRequest. Evaluating enriched script")
 
-      val rResponse: RResponse = Try({
+      val rResponse: Message = Try({
 
         val r = processRequest(
           uuid,
@@ -268,7 +268,7 @@ class RServeActor extends Actor {
         r
       }) match {
         case Success(r) => r
-        case Failure(_) => null
+        case Failure(e) => RException(e)
       }
 
       if (autoDeleteTempFiles) {
