@@ -14,7 +14,7 @@ object AlpineRConnectorBuild extends Build {
   lazy val sharedSettings = Defaults.defaultSettings ++ scalariformSettings ++ assemblySettings  ++ Seq(  
     version := "0.7",
     organization := "com.alpine",
-    scalaVersion := "2.10.3",
+    scalaVersion := "2.11.8",
     fork := true,
     fork in Test := false,
     javaOptions ++= Seq("-Xmx2G", "-Xms64M", "-XX:MaxPermSize=512M", "-XX:+UseConcMarkSweepGC", "-XX:+CMSClassUnloadingEnabled"),
