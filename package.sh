@@ -2,9 +2,9 @@
 
 packaging_folder="r-connector-packaging"
 scala_version="2.11"
-tsds_version="6.3.2"
+tsds_version="6.4.0"
 jar_name="alpine-r-connector.jar"
-tar_name="TIB_sfire-dscr_${tsds_version}_linux_x86_64.tar"
+tar_name="TIB_sfire-dscr_${tsds_version}_lin_x86_64.tar"
 md5_name="${tar_name}.md5"
 
 echo "*** Creating packaging folder ${packaging_folder}"
